@@ -107,7 +107,6 @@ export class NervToggle extends NervBase<NervToggleProps> {
   }
 
   private _slideThumbTo(targetX: number, durationMs: number): void {
-    // Kill any in-flight animation
     if (this._animTicker) {
       Ticker.shared.remove(this._animTicker);
       this._animTicker = null;
@@ -115,22 +114,32 @@ export class NervToggle extends NervBase<NervToggleProps> {
 
     const startX = this._thumbContainer.position.x;
     const distance = targetX - startX;
-    let elapsed = 0;
+    if (Math.abs(distance) < 0.5) {
+      this._thumbContainer.position.x = targetX;
+      return;
+    }
 
-    this._animTicker = (ticker) => {
+    let elapsed = 0;
+    console.log(`[TOGGLE] slide from ${startX.toFixed(1)} to ${targetX.toFixed(1)}, distance=${distance.toFixed(1)}, duration=${durationMs}ms`);
+
+    const tickFn = (ticker: { deltaMS: number }) => {
       elapsed += ticker.deltaMS;
       const t = Math.min(elapsed / durationMs, 1);
-      const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
-      this._thumbContainer.position.x = startX + distance * eased;
+      const eased = 1 - Math.pow(1 - t, 3);
+      const newX = startX + distance * eased;
+      this._thumbContainer.position.x = newX;
+      console.log(`[TOGGLE] tick: t=${t.toFixed(3)} x=${newX.toFixed(1)} (elapsed=${elapsed.toFixed(1)}ms)`);
 
       if (t >= 1) {
         this._thumbContainer.position.x = targetX;
-        Ticker.shared.remove(this._animTicker!);
+        Ticker.shared.remove(tickFn);
         this._animTicker = null;
+        console.log(`[TOGGLE] animation complete at x=${targetX}`);
       }
     };
 
-    Ticker.shared.add(this._animTicker);
+    this._animTicker = tickFn;
+    Ticker.shared.add(tickFn);
   }
 
   protected onDispose(): void {
