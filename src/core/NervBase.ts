@@ -111,8 +111,11 @@ export abstract class NervBase<
     this.cursor = this._props.disabled ? 'default' : 'pointer';
 
     this.setupInteraction();
-    this.onInit();
-    this.scheduleRedraw();
+    // Defer onInit to after child class field initializers have run
+    queueMicrotask(() => {
+      this.onInit();
+      this.scheduleRedraw();
+    });
   }
 
   // -- Lifecycle hooks --
