@@ -52,7 +52,9 @@ export class NervSelectMenu extends NervBase<NervSelectMenuProps, SelectState> {
 
     this.addChild(this._trigger, this._arrow, this._labelText, this._triggerText);
 
-    this.on('pointerup', () => {
+    this.on('pointerdown', (e) => { e.stopPropagation(); });
+    this.on('pointerup', (e) => {
+      e.stopPropagation();
       if (this.isDisabled) return;
       this.setState({ open: !this._state.open });
     });
@@ -116,10 +118,17 @@ export class NervSelectMenu extends NervBase<NervSelectMenuProps, SelectState> {
     }
     this._arrow.stroke();
 
-    // Dropdown -- ephemeral, must be removed before recreating
-    if (this._dropdown) { this.removeChild(this._dropdown); this._dropdown.destroy({ children: true }); this._dropdown = null; }
+    // Only rebuild dropdown when open state changes, not on every hover redraw
+    const shouldBeOpen = this._state.open;
+    const isCurrentlyOpen = this._dropdown !== null;
 
-    if (this._state.open) {
+    if (!shouldBeOpen && isCurrentlyOpen) {
+      this.removeChild(this._dropdown!);
+      this._dropdown!.destroy({ children: true });
+      this._dropdown = null;
+    }
+
+    if (shouldBeOpen && !isCurrentlyOpen) {
       const options = p.options ?? [];
       const maxVis = p.maxVisibleOptions ?? 6;
       const visCount = Math.min(options.length, maxVis);
@@ -128,6 +137,7 @@ export class NervSelectMenu extends NervBase<NervSelectMenuProps, SelectState> {
 
       this._dropdown = new Container();
       this._dropdown.y = triggerY + triggerH + 2;
+      this._dropdown.interactiveChildren = true;
 
       const ddBg = new Graphics();
       ddBg.rect(0, 0, w, ddH);
@@ -141,13 +151,13 @@ export class NervSelectMenu extends NervBase<NervSelectMenuProps, SelectState> {
         optContainer.y = i * optH;
         optContainer.eventMode = 'static';
         optContainer.cursor = 'pointer';
+        optContainer.interactiveChildren = false;
 
-        const isHovered = this._state.hoveredIndex === i;
         const isSelected = p.selected === opt.value;
 
         const optBg = new Graphics();
         optBg.rect(0, 0, w, optH);
-        optBg.fill({ color: isHovered ? accent : 0x0A0A14, alpha: isHovered ? 0.2 : 0 });
+        optBg.fill({ color: 0x0A0A14, alpha: 0 });
         optContainer.addChild(optBg);
 
         const optText = TextRenderer.create({
@@ -167,7 +177,17 @@ export class NervSelectMenu extends NervBase<NervSelectMenuProps, SelectState> {
           optContainer.addChild(checkmark);
         }
 
-        optContainer.on('pointerover', () => this.setState({ hoveredIndex: i }));
+        optContainer.on('pointerover', () => {
+          optBg.clear();
+          optBg.rect(0, 0, w, optH);
+          optBg.fill({ color: accent, alpha: 0.2 });
+        });
+        optContainer.on('pointerout', () => {
+          optBg.clear();
+          optBg.rect(0, 0, w, optH);
+          optBg.fill({ color: 0x0A0A14, alpha: 0 });
+        });
+        optContainer.on('pointerdown', (e) => { e.stopPropagation(); });
         optContainer.on('pointerup', (e) => {
           e.stopPropagation();
           this.setProps({ selected: opt.value });

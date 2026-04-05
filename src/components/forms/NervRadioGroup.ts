@@ -22,6 +22,8 @@ export interface NervRadioGroupProps extends NervBaseProps {
 
 export class NervRadioGroup extends NervBase<NervRadioGroupProps> {
   private _items: Container[] = [];
+  private _lastSelected: string | undefined = undefined;
+  private _built = false;
 
   protected defaultProps(): NervRadioGroupProps {
     return { options: [], color: 'cyan', direction: 'column', gap: 8, radioSize: 14 };
@@ -42,11 +44,17 @@ export class NervRadioGroup extends NervBase<NervRadioGroupProps> {
   }
 
   protected redraw(): void {
-    // Clear old items -- these are ephemeral containers, must be removed before recreating
+    const p = this._props;
+
+    // Only rebuild items when selection or options change, not on hover
+    if (this._built && this._lastSelected === p.selected) return;
+    this._lastSelected = p.selected;
+    this._built = true;
+
+    // Clear old items
     for (const item of this._items) { this.removeChild(item); item.destroy({ children: true }); }
     this._items = [];
 
-    const p = this._props;
     const theme = this.theme;
     const accent = theme.colorForAccent(p.color ?? 'cyan');
     const s = p.radioSize ?? 14;
@@ -58,18 +66,17 @@ export class NervRadioGroup extends NervBase<NervRadioGroupProps> {
       const container = new Container();
       container.eventMode = 'static';
       container.cursor = 'pointer';
+      container.interactiveChildren = false;
 
       const isSelected = p.selected === opt.value;
       const cx = s / 2;
       const cy = s / 2;
 
-      // Outer circle
       const outer = new Graphics();
       outer.circle(cx, cy, s / 2);
       outer.stroke({ width: 1, color: isSelected ? accent : theme.semantic.borderDefault, alpha: 0.8 });
       container.addChild(outer);
 
-      // Inner dot
       if (isSelected) {
         const inner = new Graphics();
         inner.circle(cx, cy, s / 2 - 4);
@@ -77,8 +84,7 @@ export class NervRadioGroup extends NervBase<NervRadioGroupProps> {
         container.addChild(inner);
       }
 
-      // Label
-      const label = new NervLabel({ text: opt.label, role: 'mono', size: theme.fontSizes.sm, rawColor: theme.semantic.textSecondary });
+      const label = new NervLabel({ text: opt.label, role: 'mono', size: theme.fontSizes.sm, rawColor: theme.semantic.textSecondary, interactive: false });
       label.x = s + 6;
       label.y = Math.round((s - theme.fontSizes.sm) / 2);
       container.addChild(label);
@@ -89,7 +95,9 @@ export class NervRadioGroup extends NervBase<NervRadioGroupProps> {
         container.y = i * (itemH + gap);
       }
 
-      container.on('pointerup', () => {
+      container.on('pointerdown', (e) => { e.stopPropagation(); });
+      container.on('pointerup', (e) => {
+        e.stopPropagation();
         if (this.isDisabled) return;
         this.setProps({ selected: opt.value });
         p.onChange?.(opt.value);
@@ -103,8 +111,6 @@ export class NervRadioGroup extends NervBase<NervRadioGroupProps> {
   }
 
   protected onDispose(): void {
-    // Ephemeral items are children, so they'll be auto-destroyed by
-    // NervBase.destroy({ children: true }). Clear the reference array.
     this._items = [];
   }
 }

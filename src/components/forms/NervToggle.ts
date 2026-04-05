@@ -18,6 +18,7 @@ export class NervToggle extends NervBase<NervToggleProps> {
   private _track = new Graphics();
   private _thumb = new Graphics();
   private _label: NervLabel | null = null;
+  private _lastOnState: boolean | null = null;
 
   protected defaultProps(): NervToggleProps {
     return { on: false, color: 'green', trackWidth: 40, trackHeight: 20 };
@@ -29,7 +30,9 @@ export class NervToggle extends NervBase<NervToggleProps> {
     this._label.visible = false;
     this.addChild(this._track, this._thumb, this._label);
 
-    this.on('pointerup', () => {
+    this.on('pointerdown', (e) => { e.stopPropagation(); });
+    this.on('pointerup', (e) => {
+      e.stopPropagation();
       if (this.isDisabled) return;
       const next = !this._props.on;
       this.setProps({ on: next });
@@ -61,13 +64,16 @@ export class NervToggle extends NervBase<NervToggleProps> {
     this._track.roundRect(0, 0, tw, th, th / 2);
     this._track.stroke({ width: 1, color: isOn ? accent : theme.semantic.borderDefault, alpha: 0.7 });
 
-    // Thumb -- animate position, redraw shape
+    // Thumb -- only animate when on/off actually changes, not on hover redraws
     this._thumb.clear();
     this._thumb.circle(0, th / 2, thumbR);
     this._thumb.fill({ color: isOn ? accent : theme.semantic.textMuted });
-    // Kill any existing tween on the thumb before starting a new one
-    AnimationManager.kill(this._thumb);
-    AnimationManager.tween(this._thumb, { x: thumbX }, 150, { easing: Easing.easeOutCubic });
+
+    if (this._lastOnState !== isOn) {
+      this._lastOnState = isOn;
+      AnimationManager.kill(this._thumb);
+      AnimationManager.tween(this._thumb, { x: thumbX }, 150, { easing: Easing.easeOutCubic });
+    }
 
     // Label -- update in-place
     if (p.text) {
