@@ -1,4 +1,4 @@
-import { Graphics } from 'pixi.js';
+import { Graphics, Rectangle, TextStyle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps, NervBaseState } from '../../core/NervBase';
 import { TextRenderer } from '../../core/TextRenderer';
@@ -33,7 +33,8 @@ export class NervButton extends NervBase<NervButtonProps> {
   }
 
   protected onInit(): void {
-    this.addChild(this._bg, this._border, this._brackets);
+    this._label = TextRenderer.create({ text: '', role: 'display', size: 12, color: 0xffffff });
+    this.addChild(this._bg, this._border, this._brackets, this._label);
 
     this.on('pointerup', () => {
       if (!this.isDisabled && !this._props.loading) {
@@ -91,30 +92,22 @@ export class NervButton extends NervBase<NervButtonProps> {
     this._brackets.moveTo(w - cs, h); this._brackets.lineTo(w, h); this._brackets.lineTo(w, h - cs);
     this._brackets.stroke();
 
-    // Label
-    if (this._label) { this._label.destroy(); this.removeChild(this._label); }
-
+    // Label -- update in-place instead of destroy+recreate
     const displayText = p.loading ? '...' : (isTerminal ? `> ${p.text}` : `>> ${p.text}`);
-    this._label = TextRenderer.create({
-      text: displayText,
-      role: isTerminal ? 'mono' : 'display',
-      size: cfg.fontSize,
-      color: textColor,
-      alpha: p.disabled ? 0.4 : 1,
-    });
-    this._label.x = Math.round((w - this._label.width) / 2);
-    this._label.y = Math.round((h - this._label.height) / 2);
-    this.addChild(this._label);
+    this._label!.text = displayText.toUpperCase();
+    (this._label!.style as TextStyle).fill = textColor;
+    (this._label!.style as TextStyle).fontSize = cfg.fontSize;
+    this._label!.alpha = p.disabled ? 0.4 : 1;
+    this._label!.x = Math.round((w - this._label!.width) / 2);
+    this._label!.y = Math.round((h - this._label!.height) / 2);
 
     this.cursor = p.disabled ? 'default' : 'pointer';
     this.alpha = p.disabled ? 0.6 : 1;
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= w && y >= 0 && y <= h };
+    this.hitArea = new Rectangle(0, 0, w, h);
   }
 
   protected onDispose(): void {
-    this._bg.destroy();
-    this._border.destroy();
-    this._brackets.destroy();
-    this._label?.destroy();
+    // NervBase.destroy() passes { children: true }, so child Graphics/Text
+    // are auto-destroyed. Nothing extra to clean up here.
   }
 }

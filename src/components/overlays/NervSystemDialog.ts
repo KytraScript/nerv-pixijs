@@ -1,4 +1,4 @@
-import { Graphics } from 'pixi.js';
+import { Graphics, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps, NervBaseState } from '../../core/NervBase';
 import { TextRenderer } from '../../core/TextRenderer';
@@ -25,8 +25,8 @@ export class NervSystemDialog extends NervBase<NervSystemDialogProps> {
   private _overlay = new Graphics();
   private _panel = new Graphics();
   private _titleBar = new Graphics();
-  private _titleText: Text | null = null;
-  private _bodyText: Text | null = null;
+  private _titleText!: Text;
+  private _bodyText!: Text;
   private _actionTexts: Text[] = [];
   private _actionBgs: Graphics[] = [];
   private _brackets = new Graphics();
@@ -49,6 +49,28 @@ export class NervSystemDialog extends NervBase<NervSystemDialogProps> {
     this._overlay.on('pointerup', () => {
       this._props.onClose?.();
     });
+
+    // Create persistent Text objects
+    const theme = this.theme;
+    const accent = theme.colorForAccent(this._props.color ?? 'orange');
+
+    this._titleText = TextRenderer.create({
+      text: this._props.title ?? 'SYSTEM DIALOG',
+      role: 'display',
+      size: theme.fontSizes.sm,
+      color: accent,
+    });
+    this.addChild(this._titleText);
+
+    this._bodyText = TextRenderer.create({
+      text: '',
+      role: 'mono',
+      size: theme.fontSizes.md,
+      color: theme.semantic.textPrimary,
+      uppercase: false,
+    });
+    this._bodyText.visible = false;
+    this.addChild(this._bodyText);
   }
 
   getPreferredSize(): Size {
@@ -122,37 +144,26 @@ export class NervSystemDialog extends NervBase<NervSystemDialogProps> {
     this._brackets.moveTo(dx + dw - cs, dy + dh); this._brackets.lineTo(dx + dw, dy + dh); this._brackets.lineTo(dx + dw, dy + dh - cs);
     this._brackets.stroke();
 
-    // Title text
-    if (this._titleText) { this._titleText.destroy(); this.removeChild(this._titleText); }
-    this._titleText = TextRenderer.create({
-      text: p.title ?? 'SYSTEM DIALOG',
-      role: 'display',
-      size: theme.fontSizes.sm,
-      color: accent,
-    });
+    // Title text -- update in place
+    TextRenderer.updateText(this._titleText, p.title ?? 'SYSTEM DIALOG');
+    TextRenderer.updateStyle(this._titleText, { color: accent, size: theme.fontSizes.sm });
     this._titleText.x = dx + padding;
     this._titleText.y = dy + Math.round((titleHeight - this._titleText.height) / 2);
-    this.addChild(this._titleText);
 
-    // Body text
-    if (this._bodyText) { this._bodyText.destroy(); this.removeChild(this._bodyText); }
+    // Body text -- update in place
     if (p.body) {
-      this._bodyText = TextRenderer.create({
-        text: p.body,
-        role: 'mono',
-        size: bodyFontSize,
-        color: theme.semantic.textPrimary,
-        maxWidth: bodyMaxWidth,
-        uppercase: false,
-      });
+      TextRenderer.updateText(this._bodyText, p.body, false);
+      TextRenderer.updateStyle(this._bodyText, { color: theme.semantic.textPrimary, size: bodyFontSize });
       this._bodyText.x = dx + padding;
       this._bodyText.y = dy + titleHeight + padding;
-      this.addChild(this._bodyText);
+      this._bodyText.visible = true;
+    } else {
+      this._bodyText.visible = false;
     }
 
-    // Clean up old action elements
-    for (const t of this._actionTexts) { t.destroy(); this.removeChild(t); }
-    for (const bg of this._actionBgs) { bg.destroy(); this.removeChild(bg); }
+    // Clean up old action elements -- these are dynamic, remove from parent but don't destroy individually
+    for (const t of this._actionTexts) { this.removeChild(t); }
+    for (const bg of this._actionBgs) { this.removeChild(bg); }
     this._actionTexts = [];
     this._actionBgs = [];
 
@@ -180,7 +191,7 @@ export class NervSystemDialog extends NervBase<NervSystemDialogProps> {
 
         bg.eventMode = 'static';
         bg.cursor = 'pointer';
-        bg.hitArea = { contains: (x: number, y: number) => x >= actionX && x <= actionX + btnW && y >= actionY && y <= actionY + 28 };
+        bg.hitArea = new Rectangle(actionX, actionY, btnW, 28);
         bg.on('pointerup', () => { action.onClick?.(); });
 
         this.addChild(bg);
@@ -201,17 +212,10 @@ export class NervSystemDialog extends NervBase<NervSystemDialogProps> {
       }
     }
 
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= screenW && y >= 0 && y <= screenH };
+    this.hitArea = new Rectangle(0, 0, screenW, screenH);
   }
 
   protected onDispose(): void {
-    this._overlay.destroy();
-    this._panel.destroy();
-    this._titleBar.destroy();
-    this._brackets.destroy();
-    this._titleText?.destroy();
-    this._bodyText?.destroy();
-    for (const t of this._actionTexts) t.destroy();
-    for (const bg of this._actionBgs) bg.destroy();
+    // No manual child destruction -- NervBase.destroy() handles children.
   }
 }

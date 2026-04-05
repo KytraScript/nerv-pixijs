@@ -27,6 +27,7 @@ export class NervApp {
   readonly inputManager: InputManager;
   readonly focusManager: FocusManager;
   readonly cullingManager: CullingManager;
+  private _onResize: (() => void) | null = null;
 
   private constructor(
     pixiApp: Application,
@@ -35,6 +36,7 @@ export class NervApp {
     inputManager: InputManager,
     focusManager: FocusManager,
     cullingManager: CullingManager,
+    onResize: () => void,
   ) {
     this.pixiApp = pixiApp;
     this.viewport = viewport;
@@ -42,6 +44,7 @@ export class NervApp {
     this.inputManager = inputManager;
     this.focusManager = focusManager;
     this.cullingManager = cullingManager;
+    this._onResize = onResize;
   }
 
   static async create(options: NervAppOptions = {}): Promise<NervApp> {
@@ -50,11 +53,9 @@ export class NervApp {
     const worldWidth = options.worldWidth ?? 10000;
     const worldHeight = options.worldHeight ?? 10000;
 
-    // Initialize theme
     NervTheme.initialize(options.themeOverrides);
     const theme = NervTheme.instance;
 
-    // Create PixiJS application
     const pixiApp = new Application();
     await pixiApp.init({
       canvas: options.canvas,
@@ -70,7 +71,6 @@ export class NervApp {
       document.body.appendChild(pixiApp.canvas);
     }
 
-    // Load fonts
     await TextRenderer.installFonts();
 
     // Create viewport (infinite canvas)
@@ -91,26 +91,22 @@ export class NervApp {
 
     pixiApp.stage.addChild(viewport);
 
-    // HUD layer (screen-fixed, above viewport)
+    // HUD layer with render group (#10) -- cached independently from world
     const hudLayer = new Container();
     hudLayer.label = 'HUD';
+    hudLayer.isRenderGroup = true;
     pixiApp.stage.addChild(hudLayer);
 
-    // Focus manager
     const focusManager = new FocusManager(hudLayer);
-
-    // Input manager
     const inputManager = new InputManager(focusManager);
     inputManager.initialize();
 
-    // Culling manager
     const cullingManager = new CullingManager(
-      viewport,
-      512,
+      viewport, 512,
       options.enableCulling !== false,
     );
 
-    // Resize handler
+    // Resize handler -- stored so we can remove it on destroy (#5)
     const onResize = () => {
       const w = window.innerWidth;
       const h = window.innerHeight;
@@ -119,7 +115,7 @@ export class NervApp {
     };
     window.addEventListener('resize', onResize);
 
-    return new NervApp(pixiApp, viewport, hudLayer, inputManager, focusManager, cullingManager);
+    return new NervApp(pixiApp, viewport, hudLayer, inputManager, focusManager, cullingManager, onResize);
   }
 
   addToWorld(component: NervBase, x?: number, y?: number): void {
@@ -139,9 +135,15 @@ export class NervApp {
   }
 
   destroy(): void {
+    // Remove resize listener (#5)
+    if (this._onResize) {
+      window.removeEventListener('resize', this._onResize);
+      this._onResize = null;
+    }
     this.inputManager.destroy();
     this.focusManager.destroy();
     this.cullingManager.destroy();
-    this.pixiApp.destroy(true);
+    // Destroy with full cleanup (#6)
+    this.pixiApp.destroy(true, { children: true });
   }
 }

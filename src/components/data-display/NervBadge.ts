@@ -1,4 +1,4 @@
-import { Graphics } from 'pixi.js';
+import { Graphics, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps } from '../../core/NervBase';
 import { TextRenderer } from '../../core/TextRenderer';
@@ -18,7 +18,7 @@ const BORDER_RADIUS = 3;
 export class NervBadge extends NervBase<NervBadgeProps> {
   private _bg = new Graphics();
   private _border = new Graphics();
-  private _label: Text | null = null;
+  private _label!: Text;
 
   protected defaultProps(): NervBadgeProps {
     return {
@@ -29,7 +29,16 @@ export class NervBadge extends NervBase<NervBadgeProps> {
   }
 
   protected onInit(): void {
-    this.addChild(this._bg, this._border);
+    const theme = this.theme;
+    // Create label text once; update in redraw
+    this._label = TextRenderer.create({
+      text: '',
+      role: 'mono',
+      size: theme.fontSizes.xs,
+      color: theme.semantic.textPrimary,
+    });
+
+    this.addChild(this._bg, this._border, this._label);
   }
 
   getPreferredSize(): Size {
@@ -65,26 +74,17 @@ export class NervBadge extends NervBase<NervBadgeProps> {
     this._border.stroke();
 
     // Label
-    if (this._label) { this._label.destroy(); this.removeChild(this._label); }
-
     const textColor = isFilled ? theme.colors.black : accent;
-    this._label = TextRenderer.create({
-      text: p.text ?? 'BADGE',
-      role: 'mono',
-      size: theme.fontSizes.xs,
-      color: textColor,
-    });
+    TextRenderer.updateText(this._label, p.text ?? 'BADGE', true);
+    TextRenderer.updateStyle(this._label, { color: textColor });
     this._label.x = Math.round((w - this._label.width) / 2);
     this._label.y = Math.round((h - this._label.height) / 2);
-    this.addChild(this._label);
 
     this.cursor = 'default';
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= w && y >= 0 && y <= h };
+    this.hitArea = new Rectangle(0, 0, w, h);
   }
 
   protected onDispose(): void {
-    this._bg.destroy();
-    this._border.destroy();
-    this._label?.destroy();
+    // All children are auto-destroyed by NervBase.destroy({ children: true }).
   }
 }

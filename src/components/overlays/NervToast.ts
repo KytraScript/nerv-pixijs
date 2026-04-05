@@ -1,4 +1,4 @@
-import { Graphics } from 'pixi.js';
+import { Graphics, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps, NervBaseState } from '../../core/NervBase';
 import { TextRenderer } from '../../core/TextRenderer';
@@ -20,7 +20,7 @@ export class NervToast extends NervBase<NervToastProps> {
   private _bg = new Graphics();
   private _border = new Graphics();
   private _accentBar = new Graphics();
-  private _messageText: Text | null = null;
+  private _messageText!: Text;
   private _dismissTimer: ReturnType<typeof setTimeout> | null = null;
 
   protected defaultProps(): NervToastProps {
@@ -35,6 +35,15 @@ export class NervToast extends NervBase<NervToastProps> {
   protected onInit(): void {
     this.addChild(this._bg, this._border, this._accentBar);
     this.visible = false;
+
+    // Create persistent Text object
+    this._messageText = TextRenderer.create({
+      text: '',
+      role: 'mono',
+      size: this.theme.fontSizes.sm,
+      color: this.theme.semantic.textPrimary,
+    });
+    this.addChild(this._messageText);
   }
 
   getPreferredSize(): Size {
@@ -97,27 +106,17 @@ export class NervToast extends NervBase<NervToastProps> {
     this._accentBar.rect(0, 0, 3, h);
     this._accentBar.fill({ color: accent, alpha: 1 });
 
-    // Message text
-    if (this._messageText) { this._messageText.destroy(); this.removeChild(this._messageText); }
-    this._messageText = TextRenderer.create({
-      text: p.message ?? '',
-      role: 'mono',
-      size: theme.fontSizes.sm,
-      color: theme.semantic.textPrimary,
-      maxWidth: w - 24,
-    });
+    // Message text -- update in place
+    TextRenderer.updateText(this._messageText, p.message ?? '', false);
+    TextRenderer.updateStyle(this._messageText, { color: theme.semantic.textPrimary, size: theme.fontSizes.sm });
     this._messageText.x = 12;
     this._messageText.y = Math.round((h - this._messageText.height) / 2);
-    this.addChild(this._messageText);
 
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= w && y >= 0 && y <= h };
+    this.hitArea = new Rectangle(0, 0, w, h);
   }
 
   protected onDispose(): void {
+    // Clean up timer only -- NervBase.destroy() handles children.
     if (this._dismissTimer) clearTimeout(this._dismissTimer);
-    this._bg.destroy();
-    this._border.destroy();
-    this._accentBar.destroy();
-    this._messageText?.destroy();
   }
 }

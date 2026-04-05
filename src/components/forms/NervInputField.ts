@@ -1,4 +1,4 @@
-import { Graphics, Text, Ticker } from 'pixi.js';
+import { Graphics, Text, TextStyle, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps, NervBaseState } from '../../core/NervBase';
 import { TextRenderer } from '../../core/TextRenderer';
@@ -51,7 +51,15 @@ export class NervInputField extends NervBase<NervInputFieldProps, NervInputField
   }
 
   protected onInit(): void {
-    this.addChild(this._bg, this._border, this._cursor);
+    // Create text objects once; updated in-place in redraw()
+    this._labelText = TextRenderer.create({ text: '', role: 'mono', size: 10, color: 0x888888 });
+    this._labelText.visible = false;
+    this._valueText = TextRenderer.create({ text: '', role: 'mono', size: 12, color: 0xffffff, uppercase: false });
+    this._valueText.visible = false;
+    this._placeholderText = TextRenderer.create({ text: '', role: 'mono', size: 12, color: 0x888888, alpha: 0.5, uppercase: false });
+    this._placeholderText.visible = false;
+
+    this.addChild(this._bg, this._border, this._labelText, this._valueText, this._placeholderText, this._cursor);
     this._cursor.visible = false;
 
     this.on('pointerdown', () => {
@@ -121,32 +129,42 @@ export class NervInputField extends NervBase<NervInputFieldProps, NervInputField
       this._border.stroke();
     }
 
-    // Label
-    if (this._labelText) { this._labelText.destroy(); this.removeChild(this._labelText); }
+    // Label -- update in-place
     if (hasLabel) {
-      this._labelText = TextRenderer.create({ text: `// ${p.inputLabel}`, role: 'mono', size: cfg.fontSize - 2, color: theme.semantic.textMuted });
-      this._labelText.x = 2;
-      this._labelText.y = 0;
-      this.addChild(this._labelText);
+      this._labelText!.visible = true;
+      this._labelText!.text = `// ${p.inputLabel}`.toUpperCase();
+      (this._labelText!.style as TextStyle).fill = theme.semantic.textMuted;
+      (this._labelText!.style as TextStyle).fontSize = cfg.fontSize - 2;
+      this._labelText!.x = 2;
+      this._labelText!.y = 0;
+    } else {
+      this._labelText!.visible = false;
     }
 
-    // Value text
-    if (this._valueText) { this._valueText.destroy(); this.removeChild(this._valueText); }
+    // Value text -- update in-place
     const displayVal = p.password ? '*'.repeat(this._internalValue.length) : this._internalValue;
     if (displayVal) {
-      this._valueText = TextRenderer.create({ text: displayVal, role: 'mono', size: cfg.fontSize, color: theme.semantic.textPrimary, uppercase: false });
-      this._valueText.x = 8;
-      this._valueText.y = fieldY + Math.round((cfg.h - this._valueText.height) / 2);
-      this.addChild(this._valueText);
+      this._valueText!.visible = true;
+      this._valueText!.text = displayVal;
+      (this._valueText!.style as TextStyle).fill = theme.semantic.textPrimary;
+      (this._valueText!.style as TextStyle).fontSize = cfg.fontSize;
+      this._valueText!.x = 8;
+      this._valueText!.y = fieldY + Math.round((cfg.h - this._valueText!.height) / 2);
+    } else {
+      this._valueText!.visible = false;
     }
 
-    // Placeholder
-    if (this._placeholderText) { this._placeholderText.destroy(); this.removeChild(this._placeholderText); }
+    // Placeholder -- update in-place
     if (!displayVal && p.placeholder) {
-      this._placeholderText = TextRenderer.create({ text: p.placeholder, role: 'mono', size: cfg.fontSize, color: theme.semantic.textMuted, alpha: 0.5 });
-      this._placeholderText.x = 8;
-      this._placeholderText.y = fieldY + Math.round((cfg.h - this._placeholderText.height) / 2);
-      this.addChild(this._placeholderText);
+      this._placeholderText!.visible = true;
+      this._placeholderText!.text = p.placeholder.toUpperCase();
+      (this._placeholderText!.style as TextStyle).fill = theme.semantic.textMuted;
+      (this._placeholderText!.style as TextStyle).fontSize = cfg.fontSize;
+      this._placeholderText!.alpha = 0.5;
+      this._placeholderText!.x = 8;
+      this._placeholderText!.y = fieldY + Math.round((cfg.h - this._placeholderText!.height) / 2);
+    } else {
+      this._placeholderText!.visible = false;
     }
 
     // Cursor
@@ -160,19 +178,14 @@ export class NervInputField extends NervBase<NervInputFieldProps, NervInputField
     }
     this._cursor.visible = this._state.focused && this._state.cursorVisible;
 
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= w && y >= fieldY && y <= fieldY + cfg.h };
+    this.hitArea = new Rectangle(0, fieldY, w, cfg.h);
   }
 
   get value(): string { return this._internalValue; }
   set value(v: string) { this._internalValue = v; this.scheduleRedraw(); }
 
   protected onDispose(): void {
+    // Only clean up non-child resources; children are auto-destroyed by NervBase
     if (this._cursorTimer) clearInterval(this._cursorTimer);
-    this._bg.destroy();
-    this._border.destroy();
-    this._cursor.destroy();
-    this._valueText?.destroy();
-    this._placeholderText?.destroy();
-    this._labelText?.destroy();
   }
 }

@@ -1,4 +1,4 @@
-import { Graphics } from 'pixi.js';
+import { Graphics, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps, NervBaseState } from '../../core/NervBase';
 import { TextRenderer } from '../../core/TextRenderer';
@@ -60,9 +60,9 @@ export class NervNavigationTabs extends NervBase<NervNavigationTabsProps, NervNa
     const tabs = p.tabs ?? [];
     const { width: w, height: h } = this.getPreferredSize();
 
-    // Cleanup
-    for (const g of this._tabBgs) { g.destroy(); this.removeChild(g); }
-    for (const t of this._tabTexts) { t.destroy(); this.removeChild(t); }
+    // Remove previous dynamic elements from parent (don't destroy -- children: true handles it)
+    for (const g of this._tabBgs) { this.removeChild(g); }
+    for (const t of this._tabTexts) { this.removeChild(t); }
     this._tabBgs = [];
     this._tabTexts = [];
     if (this._indicator.parent) this.removeChild(this._indicator);
@@ -94,7 +94,7 @@ export class NervNavigationTabs extends NervBase<NervNavigationTabsProps, NervNa
 
       tabBg.eventMode = 'static';
       tabBg.cursor = 'pointer';
-      tabBg.hitArea = { contains: (x: number, y: number) => x >= tx && x <= tx + tabW && y >= 0 && y <= h };
+      tabBg.hitArea = new Rectangle(tx, 0, tabW, h);
 
       const idx = i;
       tabBg.on('pointerover', () => this.setState({ hoveredTab: idx }));
@@ -130,13 +130,10 @@ export class NervNavigationTabs extends NervBase<NervNavigationTabsProps, NervNa
     }
     this.addChild(this._indicator);
 
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= w && y >= 0 && y <= h };
+    this.hitArea = new Rectangle(0, 0, w, h);
   }
 
   protected onDispose(): void {
-    this._bg.destroy();
-    this._indicator.destroy();
-    for (const g of this._tabBgs) g.destroy();
-    for (const t of this._tabTexts) t.destroy();
+    // No manual child destruction -- NervBase.destroy() handles children.
   }
 }

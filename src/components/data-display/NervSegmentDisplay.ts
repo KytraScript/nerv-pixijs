@@ -1,4 +1,4 @@
-import { Graphics } from 'pixi.js';
+import { Graphics, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps } from '../../core/NervBase';
 import type { NervColor, Size } from '../../core/types';
@@ -121,7 +121,7 @@ export class NervSegmentDisplay extends NervBase<NervSegmentDisplayProps> {
       }
     }
 
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= w && y >= 0 && y <= h };
+    this.hitArea = new Rectangle(0, 0, w, h);
   }
 
   private drawDigitSegments(
@@ -170,8 +170,6 @@ export class NervSegmentDisplay extends NervBase<NervSegmentDisplayProps> {
   }
 
   protected onDispose(): void {
-    this._bg.destroy();
-    this._border.destroy();
-    this._segGraphics.destroy();
+    // All children are auto-destroyed by NervBase.destroy({ children: true }).
   }
 }

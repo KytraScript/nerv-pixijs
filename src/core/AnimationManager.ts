@@ -45,7 +45,8 @@ export class AnimationManager {
   private static init(): void {
     if (this._initialized) return;
     this._initialized = true;
-    Ticker.shared.add((ticker) => this.update(ticker.deltaMS));
+    // Use deltaMS scaled by ticker.speed so slow-mo/pause affects tweens
+    Ticker.shared.add((ticker) => this.update(ticker.deltaMS * ticker.speed));
   }
 
   private static update(deltaMs: number): void {

@@ -1,4 +1,4 @@
-import { Container, Rectangle, Ticker } from 'pixi.js';
+import { Container, DestroyOptions, Rectangle, Ticker } from 'pixi.js';
 import { NervTheme } from './NervTheme';
 import { AnimationManager } from './AnimationManager';
 import type { Insets, Size } from './types';
@@ -12,6 +12,7 @@ export interface NervBaseProps {
   visible?: boolean;
   alpha?: number;
   disabled?: boolean;
+  interactive?: boolean;
   tabIndex?: number;
   label?: string;
 }
@@ -107,10 +108,13 @@ export abstract class NervBase<
     if (props.visible !== undefined) this.visible = props.visible;
     if (props.alpha !== undefined) this.alpha = props.alpha;
 
-    this.eventMode = 'static';
+    // #12: Only set interactive mode if the component needs it
+    const needsInteraction = props.interactive !== false && props.disabled !== true;
+    this.eventMode = needsInteraction ? 'static' : 'none';
     this.cursor = this._props.disabled ? 'default' : 'pointer';
 
-    this.setupInteraction();
+    if (needsInteraction) this.setupInteraction();
+
     // Defer onInit to after child class field initializers have run
     queueMicrotask(() => {
       this.onInit();
@@ -157,13 +161,16 @@ export abstract class NervBase<
     this.setState({ focused: false } as Partial<S>);
   }
 
-  // -- Cleanup --
-  destroy(options?: { children?: boolean }): void {
+  // -- Cleanup (#4: proper DestroyOptions type, #14: don't double-destroy children) --
+  destroy(options?: DestroyOptions): void {
     AnimationManager.kill(this);
     if (this._tickerCallback) {
       Ticker.shared.remove(this._tickerCallback);
     }
     this.onDispose();
-    super.destroy(options);
+    // Let super.destroy handle children -- onDispose should only clean up
+    // non-child resources (timers, listeners, pools). Child Graphics/Text
+    // are destroyed by the Container's recursive destroy.
+    super.destroy({ children: true, ...options as Record<string, unknown> });
   }
 }

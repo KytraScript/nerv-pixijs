@@ -1,4 +1,4 @@
-import { Graphics, Ticker } from 'pixi.js';
+import { Graphics, Rectangle, Ticker } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps, NervBaseState } from '../../core/NervBase';
 import { TextRenderer } from '../../core/TextRenderer';
@@ -20,9 +20,9 @@ interface NervEmergencyBannerState extends NervBaseState {
 export class NervEmergencyBanner extends NervBase<NervEmergencyBannerProps, NervEmergencyBannerState> {
   private _bg = new Graphics();
   private _border = new Graphics();
-  private _textA: Text | null = null;
-  private _textB: Text | null = null;
-  private _mask = new Graphics();
+  private _textA!: Text;
+  private _textB!: Text;
+  private _clipMask = new Graphics();
   private _ticker: (() => void) | null = null;
   private _blinkElapsed = 0;
   private _scrollElapsed = 0;
@@ -37,11 +37,36 @@ export class NervEmergencyBanner extends NervBase<NervEmergencyBannerProps, Nerv
       color: 'red',
       scrollSpeed: 60,
       blinking: true,
+      interactive: false,
     };
   }
 
   protected onInit(): void {
     this.addChild(this._bg, this._border);
+
+    // Create persistent Text objects for scrolling
+    const theme = this.theme;
+    const accent = theme.colorForAccent(this._props.color ?? 'red');
+
+    this._textA = TextRenderer.create({
+      text: '',
+      role: 'display',
+      size: theme.fontSizes.sm,
+      color: accent,
+    });
+    this._textB = TextRenderer.create({
+      text: '',
+      role: 'display',
+      size: theme.fontSizes.sm,
+      color: accent,
+    });
+    this.addChild(this._textA, this._textB);
+
+    // Apply mask so text doesn't overflow
+    this._clipMask.rect(0, 0, 1, 1);
+    this._clipMask.fill({ color: 0xFFFFFF });
+    this.addChild(this._clipMask);
+    this.mask = this._clipMask;
 
     this._ticker = () => {
       const dt = Ticker.shared.deltaMS;
@@ -84,7 +109,6 @@ export class NervEmergencyBanner extends NervBase<NervEmergencyBannerProps, Nerv
   private _updateTextPositions(): void {
     const offset = this._state.scrollOffset;
     const repeatW = this._getRepeatWidth();
-    const w = this.componentWidth;
 
     if (this._textA) {
       this._textA.x = -offset;
@@ -127,50 +151,30 @@ export class NervEmergencyBanner extends NervBase<NervEmergencyBannerProps, Nerv
     this._border.moveTo(0, h); this._border.lineTo(w, h);
     this._border.stroke();
 
-    // Scrolling text instances
-    if (this._textA) { this._textA.destroy(); this.removeChild(this._textA); }
-    if (this._textB) { this._textB.destroy(); this.removeChild(this._textB); }
-
+    // Update scrolling text content in place
     const spacedMsg = `  ///  ${p.message ?? 'EMERGENCY'}  ///  ${p.message ?? 'EMERGENCY'}`;
 
-    this._textA = TextRenderer.create({
-      text: spacedMsg,
-      role: 'display',
-      size: theme.fontSizes.sm,
-      color: accent,
-    });
+    TextRenderer.updateText(this._textA, spacedMsg);
+    TextRenderer.updateStyle(this._textA, { color: accent, size: theme.fontSizes.sm });
     this._textA.y = Math.round((h - this._textA.height) / 2);
 
-    this._textB = TextRenderer.create({
-      text: spacedMsg,
-      role: 'display',
-      size: theme.fontSizes.sm,
-      color: accent,
-    });
+    TextRenderer.updateText(this._textB, spacedMsg);
+    TextRenderer.updateStyle(this._textB, { color: accent, size: theme.fontSizes.sm });
     this._textB.y = this._textA.y;
 
-    this.addChild(this._textA, this._textB);
-
-    // Apply mask so text doesn't overflow
-    if (this._mask.parent) this.removeChild(this._mask);
-    this._mask.clear();
-    this._mask.rect(0, 0, w, h);
-    this._mask.fill({ color: 0xFFFFFF });
-    this.addChild(this._mask);
-    this.mask = this._mask;
+    // Update mask dimensions
+    this._clipMask.clear();
+    this._clipMask.rect(0, 0, w, h);
+    this._clipMask.fill({ color: 0xFFFFFF });
 
     this._updateTextPositions();
 
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= w && y >= 0 && y <= h };
+    this.hitArea = new Rectangle(0, 0, w, h);
   }
 
   protected onDispose(): void {
+    // Clean up ticker and mask only -- NervBase.destroy() handles children.
     if (this._ticker) Ticker.shared.remove(this._ticker);
     this.mask = null;
-    this._bg.destroy();
-    this._border.destroy();
-    this._mask.destroy();
-    this._textA?.destroy();
-    this._textB?.destroy();
   }
 }

@@ -38,8 +38,7 @@ export class ScanlineOverlay extends Container {
     this._gfx.stroke();
   }
 
-  destroy(): void {
-    this._gfx.destroy();
-    super.destroy();
+  destroy(options?: boolean | { children?: boolean }): void {
+    super.destroy({ children: true, ...(typeof options === 'object' ? options : {}) });
   }
 }

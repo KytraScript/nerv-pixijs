@@ -1,4 +1,4 @@
-import { Graphics, Text } from 'pixi.js';
+import { Graphics, Text, TextStyle, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps, NervBaseState } from '../../core/NervBase';
 import { TextRenderer } from '../../core/TextRenderer';
@@ -46,7 +46,15 @@ export class NervTextArea extends NervBase<NervTextAreaProps, NervTextAreaState>
   }
 
   protected onInit(): void {
-    this.addChild(this._bg, this._border, this._cursor);
+    // Create text objects once; updated in-place in redraw()
+    this._labelText = TextRenderer.create({ text: '', role: 'mono', size: 10, color: 0x888888 });
+    this._labelText.visible = false;
+    this._valueText = TextRenderer.create({ text: '', role: 'mono', size: 12, color: 0xffffff, uppercase: false });
+    this._valueText.visible = false;
+    this._placeholderText = TextRenderer.create({ text: '', role: 'mono', size: 12, color: 0x888888, alpha: 0.5, uppercase: false });
+    this._placeholderText.visible = false;
+
+    this.addChild(this._bg, this._border, this._labelText, this._valueText, this._placeholderText, this._cursor);
     this.on('pointerdown', () => this.focus());
   }
 
@@ -100,37 +108,39 @@ export class NervTextArea extends NervBase<NervTextAreaProps, NervTextAreaState>
     this._border.rect(0, fieldY, w, fieldH);
     this._border.stroke();
 
-    // Label
-    if (this._labelText) { this._labelText.destroy(); this.removeChild(this._labelText); this._labelText = null; }
+    // Label -- update in-place
     if (hasLabel) {
-      this._labelText = TextRenderer.create({ text: `// ${p.textareaLabel}`, role: 'mono', size: 10, color: theme.semantic.textMuted });
-      this._labelText.x = 2;
-      this.addChild(this._labelText);
+      this._labelText!.visible = true;
+      this._labelText!.text = `// ${p.textareaLabel}`.toUpperCase();
+      (this._labelText!.style as TextStyle).fill = theme.semantic.textMuted;
+      this._labelText!.x = 2;
+    } else {
+      this._labelText!.visible = false;
     }
 
-    // Value
-    if (this._valueText) { this._valueText.destroy(); this.removeChild(this._valueText); this._valueText = null; }
+    // Value -- update in-place
     if (this._internalValue) {
-      this._valueText = TextRenderer.create({
-        text: this._internalValue,
-        role: 'mono',
-        size: 12,
-        color: theme.semantic.textPrimary,
-        uppercase: false,
-        maxWidth: w - 16,
-      });
-      this._valueText.x = 8;
-      this._valueText.y = fieldY + 8;
-      this.addChild(this._valueText);
+      this._valueText!.visible = true;
+      this._valueText!.text = this._internalValue;
+      (this._valueText!.style as TextStyle).fill = theme.semantic.textPrimary;
+      (this._valueText!.style as TextStyle).wordWrap = true;
+      (this._valueText!.style as TextStyle).wordWrapWidth = w - 16;
+      this._valueText!.x = 8;
+      this._valueText!.y = fieldY + 8;
+    } else {
+      this._valueText!.visible = false;
     }
 
-    // Placeholder
-    if (this._placeholderText) { this._placeholderText.destroy(); this.removeChild(this._placeholderText); this._placeholderText = null; }
+    // Placeholder -- update in-place
     if (!this._internalValue && p.placeholder) {
-      this._placeholderText = TextRenderer.create({ text: p.placeholder, role: 'mono', size: 12, color: theme.semantic.textMuted, alpha: 0.5, uppercase: false });
-      this._placeholderText.x = 8;
-      this._placeholderText.y = fieldY + 8;
-      this.addChild(this._placeholderText);
+      this._placeholderText!.visible = true;
+      this._placeholderText!.text = p.placeholder.toUpperCase();
+      (this._placeholderText!.style as TextStyle).fill = theme.semantic.textMuted;
+      this._placeholderText!.alpha = 0.5;
+      this._placeholderText!.x = 8;
+      this._placeholderText!.y = fieldY + 8;
+    } else {
+      this._placeholderText!.visible = false;
     }
 
     // Cursor
@@ -146,19 +156,14 @@ export class NervTextArea extends NervBase<NervTextAreaProps, NervTextAreaState>
       this._cursor.stroke();
     }
 
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= w && y >= fieldY && y <= fieldY + fieldH };
+    this.hitArea = new Rectangle(0, fieldY, w, fieldH);
   }
 
   get value(): string { return this._internalValue; }
   set value(v: string) { this._internalValue = v; this.scheduleRedraw(); }
 
   protected onDispose(): void {
+    // Only clean up non-child resources; children are auto-destroyed by NervBase
     if (this._cursorTimer) clearInterval(this._cursorTimer);
-    this._bg.destroy();
-    this._border.destroy();
-    this._cursor.destroy();
-    this._valueText?.destroy();
-    this._placeholderText?.destroy();
-    this._labelText?.destroy();
   }
 }

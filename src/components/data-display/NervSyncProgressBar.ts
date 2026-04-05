@@ -1,4 +1,4 @@
-import { Graphics } from 'pixi.js';
+import { Graphics, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps } from '../../core/NervBase';
 import { TextRenderer } from '../../core/TextRenderer';
@@ -19,7 +19,7 @@ export class NervSyncProgressBar extends NervBase<NervSyncProgressBarProps> {
   private _bg = new Graphics();
   private _border = new Graphics();
   private _segments = new Graphics();
-  private _labelText: Text | null = null;
+  private _labelText!: Text;
 
   protected defaultProps(): NervSyncProgressBarProps {
     return {
@@ -33,7 +33,17 @@ export class NervSyncProgressBar extends NervBase<NervSyncProgressBarProps> {
   }
 
   protected onInit(): void {
-    this.addChild(this._bg, this._segments, this._border);
+    const theme = this.theme;
+    // Create label text once; toggle visibility in redraw
+    this._labelText = TextRenderer.create({
+      text: '',
+      role: 'mono',
+      size: theme.fontSizes.xs,
+      color: theme.semantic.textPrimary,
+    });
+    this._labelText.visible = false;
+
+    this.addChild(this._bg, this._segments, this._border, this._labelText);
   }
 
   getPreferredSize(): Size {
@@ -83,28 +93,22 @@ export class NervSyncProgressBar extends NervBase<NervSyncProgressBarProps> {
     }
 
     // Label
-    if (this._labelText) { this._labelText.destroy(); this.removeChild(this._labelText); this._labelText = null; }
     if (p.showLabel) {
       const percent = Math.round(value * 100);
       const labelStr = p.label ? `${p.label} ${percent}%` : `${percent}%`;
-      this._labelText = TextRenderer.create({
-        text: labelStr,
-        role: 'mono',
-        size: theme.fontSizes.xs,
-        color: accent,
-      });
+      TextRenderer.updateText(this._labelText, labelStr, true);
+      TextRenderer.updateStyle(this._labelText, { color: accent });
       this._labelText.x = Math.round((barW - this._labelText.width) / 2);
       this._labelText.y = barH + 2;
-      this.addChild(this._labelText);
+      this._labelText.visible = true;
+    } else {
+      this._labelText.visible = false;
     }
 
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= barW && y >= 0 && y <= barH };
+    this.hitArea = new Rectangle(0, 0, barW, barH);
   }
 
   protected onDispose(): void {
-    this._bg.destroy();
-    this._border.destroy();
-    this._segments.destroy();
-    this._labelText?.destroy();
+    // All children are auto-destroyed by NervBase.destroy({ children: true }).
   }
 }

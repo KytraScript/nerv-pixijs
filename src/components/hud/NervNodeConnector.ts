@@ -19,13 +19,12 @@ export class NervNodeConnector extends NervBase<NervNodeConnectorProps> {
       color: 'orange',
       lineWidth: 1.5,
       curved: true,
+      interactive: false,
     };
   }
 
   protected onInit(): void {
     this.addChild(this._line);
-    this.eventMode = 'none';
-    this.cursor = 'default';
   }
 
   getPreferredSize(): Size {
@@ -98,6 +97,6 @@ export class NervNodeConnector extends NervBase<NervNodeConnectorProps> {
   }
 
   protected onDispose(): void {
-    this._line.destroy();
+    // No manual child destruction -- NervBase.destroy() handles children.
   }
 }

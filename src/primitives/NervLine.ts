@@ -19,7 +19,7 @@ export class NervLine extends NervBase<NervLineProps> {
   private _gfx = new Graphics();
 
   protected defaultProps(): NervLineProps {
-    return { length: 100, direction: 'horizontal', thickness: 1 };
+    return { length: 100, direction: 'horizontal', thickness: 1, interactive: false };
   }
 
   protected onInit(): void {
@@ -74,9 +74,5 @@ export class NervLine extends NervBase<NervLineProps> {
       }
       this._gfx.stroke();
     }
-  }
-
-  protected onDispose(): void {
-    this._gfx.destroy();
   }
 }

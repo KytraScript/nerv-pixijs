@@ -22,7 +22,8 @@ export class NervLineChart extends NervBase<NervLineChartProps> {
   private _grid = new Graphics();
   private _lines = new Graphics();
   private _dots = new Graphics();
-  private _textNodes: Text[] = [];
+  private _textPool: Text[] = [];
+  private _textPoolUsed = 0;
 
   protected defaultProps(): NervLineChartProps {
     return {
@@ -33,6 +34,7 @@ export class NervLineChart extends NervBase<NervLineChartProps> {
       height: 200,
       showGrid: true,
       showDots: true,
+      interactive: false,
     };
   }
 
@@ -47,6 +49,28 @@ export class NervLineChart extends NervBase<NervLineChartProps> {
     };
   }
 
+  private _acquireText(opts: Parameters<typeof TextRenderer.create>[0]): Text {
+    if (this._textPoolUsed < this._textPool.length) {
+      const t = this._textPool[this._textPoolUsed];
+      t.visible = true;
+      TextRenderer.updateText(t, opts.text, opts.uppercase ?? true);
+      TextRenderer.updateStyle(t, { color: opts.color, size: opts.size, alpha: opts.alpha });
+      this._textPoolUsed++;
+      return t;
+    }
+    const t = TextRenderer.create(opts);
+    this._textPool.push(t);
+    this.addChild(t);
+    this._textPoolUsed++;
+    return t;
+  }
+
+  private _reclaimPool(): void {
+    for (let i = this._textPoolUsed; i < this._textPool.length; i++) {
+      this._textPool[i].visible = false;
+    }
+  }
+
   protected redraw(): void {
     const p = this._props;
     const theme = this.theme;
@@ -56,15 +80,16 @@ export class NervLineChart extends NervBase<NervLineChartProps> {
     const colors = p.colors ?? [];
     const labels = p.labels ?? [];
 
-    // Clean up text
-    for (const t of this._textNodes) { this.removeChild(t); t.destroy(); }
-    this._textNodes = [];
+    this._textPoolUsed = 0;
 
     this._grid.clear();
     this._lines.clear();
     this._dots.clear();
 
-    if (data.length === 0) return;
+    if (data.length === 0) {
+      this._reclaimPool();
+      return;
+    }
 
     // Compute bounds
     const labelArea = labels.length > 0 ? theme.fontSizes.xs + theme.spacing.sm : 0;
@@ -87,7 +112,10 @@ export class NervLineChart extends NervBase<NervLineChartProps> {
     for (const series of data) {
       if (series.length > maxPoints) maxPoints = series.length;
     }
-    if (maxPoints < 2) return;
+    if (maxPoints < 2) {
+      this._reclaimPool();
+      return;
+    }
 
     // Grid
     if (p.showGrid) {
@@ -149,7 +177,7 @@ export class NervLineChart extends NervBase<NervLineChartProps> {
       const step = Math.max(1, Math.floor(labels.length / Math.min(labels.length, 8)));
       for (let i = 0; i < labels.length; i += step) {
         const x = (i / (maxPoints - 1)) * chartW;
-        const lt = TextRenderer.create({
+        const lt = this._acquireText({
           text: labels[i],
           role: 'mono',
           size: theme.fontSizes.xs,
@@ -158,16 +186,13 @@ export class NervLineChart extends NervBase<NervLineChartProps> {
         });
         lt.x = x - lt.width / 2;
         lt.y = chartH + theme.spacing.xxs;
-        this.addChild(lt);
-        this._textNodes.push(lt);
       }
     }
+
+    this._reclaimPool();
   }
 
   protected onDispose(): void {
-    this._grid.destroy();
-    this._lines.destroy();
-    this._dots.destroy();
-    for (const t of this._textNodes) t.destroy();
+    // No manual child destruction -- NervBase.destroy() handles children.
   }
 }

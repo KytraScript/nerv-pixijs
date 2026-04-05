@@ -1,4 +1,4 @@
-import { Graphics } from 'pixi.js';
+import { Graphics, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps } from '../../core/NervBase';
 import { NervLabel } from '../../primitives/NervLabel';
@@ -23,7 +23,10 @@ export class NervCheckbox extends NervBase<NervCheckboxProps> {
   }
 
   protected onInit(): void {
-    this.addChild(this._box, this._check);
+    // Create the label once; updated in-place via setProps in redraw()
+    this._label = new NervLabel({ text: '', role: 'mono', size: this.theme.fontSizes.sm, rawColor: this.theme.semantic.textSecondary, interactive: false });
+    this._label.visible = false;
+    this.addChild(this._box, this._check, this._label);
 
     this.on('pointerup', () => {
       if (this.isDisabled) return;
@@ -66,22 +69,22 @@ export class NervCheckbox extends NervBase<NervCheckboxProps> {
       this._check.stroke();
     }
 
-    // Label
-    if (this._label) { this._label.destroy({ children: true }); this.removeChild(this._label); this._label = null; }
+    // Label -- update in-place
     if (p.text) {
-      this._label = new NervLabel({ text: p.text, role: 'mono', size: theme.fontSizes.sm, rawColor: theme.semantic.textSecondary });
-      this._label.x = s + 8;
-      this._label.y = Math.round((s - theme.fontSizes.sm) / 2);
-      this.addChild(this._label);
+      this._label!.visible = true;
+      this._label!.setProps({ text: p.text, size: theme.fontSizes.sm, rawColor: theme.semantic.textSecondary });
+      this._label!.x = s + 8;
+      this._label!.y = Math.round((s - theme.fontSizes.sm) / 2);
+    } else {
+      this._label!.visible = false;
     }
 
     const { width: w, height: h } = this.getPreferredSize();
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= w && y >= 0 && y <= h };
+    this.hitArea = new Rectangle(0, 0, w, h);
   }
 
   protected onDispose(): void {
-    this._box.destroy();
-    this._check.destroy();
-    this._label?.destroy({ children: true });
+    // NervBase.destroy() passes { children: true }, so child Graphics/NervLabel
+    // are auto-destroyed. Nothing extra to clean up here.
   }
 }

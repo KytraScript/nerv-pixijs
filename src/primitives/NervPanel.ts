@@ -1,4 +1,4 @@
-import { Graphics } from 'pixi.js';
+import { Graphics, Rectangle } from 'pixi.js';
 import { NervBase } from '../core/NervBase';
 import type { NervBaseProps, NervBaseState } from '../core/NervBase';
 import type { NervColor, Size } from '../core/types';
@@ -89,12 +89,6 @@ export class NervPanel extends NervBase<NervPanelProps> {
       this._brackets.stroke();
     }
 
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= w && y >= 0 && y <= h };
-  }
-
-  protected onDispose(): void {
-    this._bg.destroy();
-    this._border.destroy();
-    this._brackets.destroy();
+    this.hitArea = new Rectangle(0, 0, w, h);
   }
 }

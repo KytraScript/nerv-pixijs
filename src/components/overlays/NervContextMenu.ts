@@ -1,4 +1,4 @@
-import { Graphics } from 'pixi.js';
+import { Graphics, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps, NervBaseState } from '../../core/NervBase';
 import { TextRenderer } from '../../core/TextRenderer';
@@ -93,9 +93,9 @@ export class NervContextMenu extends NervBase<NervContextMenuProps, NervContextM
     const items = p.items ?? [];
     const { width: w, height: h } = this.getPreferredSize();
 
-    // Cleanup previous items
-    for (const g of this._itemGraphics) { g.destroy(); this.removeChild(g); }
-    for (const t of this._itemTexts) { t.destroy(); this.removeChild(t); }
+    // Remove previous dynamic items from parent (don't destroy -- children: true handles it)
+    for (const g of this._itemGraphics) { this.removeChild(g); }
+    for (const t of this._itemTexts) { this.removeChild(t); }
     this._itemGraphics = [];
     this._itemTexts = [];
 
@@ -141,7 +141,7 @@ export class NervContextMenu extends NervBase<NervContextMenuProps, NervContextM
 
       itemBg.eventMode = 'static';
       itemBg.cursor = item.disabled ? 'default' : 'pointer';
-      itemBg.hitArea = { contains: (x: number, y: number) => x >= pad && x <= w - pad && y >= cy && y <= cy + itemH };
+      itemBg.hitArea = new Rectangle(pad, cy, w - pad * 2, itemH);
 
       const idx = i;
       itemBg.on('pointerover', () => {
@@ -175,16 +175,14 @@ export class NervContextMenu extends NervBase<NervContextMenuProps, NervContextM
       cy += itemH;
     }
 
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= w && y >= 0 && y <= h };
+    this.hitArea = new Rectangle(0, 0, w, h);
   }
 
   protected onDispose(): void {
+    // Clean up global listener only -- NervBase.destroy() handles children.
     if (this._closeListener) {
       globalThis.removeEventListener?.('pointerdown', this._closeListener);
+      this._closeListener = null;
     }
-    this._bg.destroy();
-    this._border.destroy();
-    for (const g of this._itemGraphics) g.destroy();
-    for (const t of this._itemTexts) t.destroy();
   }
 }

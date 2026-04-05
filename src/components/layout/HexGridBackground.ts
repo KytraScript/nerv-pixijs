@@ -23,6 +23,7 @@ export class HexGridBackground extends NervBase<HexGridBackgroundProps> {
       cellSize: 30,
       gridAlpha: 0.15,
       lineWidth: 0.5,
+      interactive: false,
     };
   }
 
@@ -82,7 +83,6 @@ export class HexGridBackground extends NervBase<HexGridBackgroundProps> {
   }
 
   protected onDispose(): void {
-    this._grid?.destroy();
-    this._contentArea.destroy({ children: true });
+    // All children are auto-destroyed by NervBase.destroy({ children: true }).
   }
 }

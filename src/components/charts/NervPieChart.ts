@@ -24,7 +24,8 @@ const SEGMENT_COLORS: NervColor[] = ['orange', 'cyan', 'green', 'red', 'purple',
 
 export class NervPieChart extends NervBase<NervPieChartProps> {
   private _segments = new Graphics();
-  private _textNodes: Text[] = [];
+  private _textPool: Text[] = [];
+  private _textPoolUsed = 0;
 
   protected defaultProps(): NervPieChartProps {
     return {
@@ -33,6 +34,7 @@ export class NervPieChart extends NervBase<NervPieChartProps> {
       donut: false,
       donutWidth: 20,
       showLabels: true,
+      interactive: false,
     };
   }
 
@@ -43,6 +45,28 @@ export class NervPieChart extends NervBase<NervPieChartProps> {
   getPreferredSize(): Size {
     const s = this._props.size ?? 160;
     return { width: s, height: s };
+  }
+
+  private _acquireText(opts: Parameters<typeof TextRenderer.create>[0]): Text {
+    if (this._textPoolUsed < this._textPool.length) {
+      const t = this._textPool[this._textPoolUsed];
+      t.visible = true;
+      TextRenderer.updateText(t, opts.text, opts.uppercase ?? true);
+      TextRenderer.updateStyle(t, { color: opts.color, size: opts.size, alpha: opts.alpha });
+      this._textPoolUsed++;
+      return t;
+    }
+    const t = TextRenderer.create(opts);
+    this._textPool.push(t);
+    this.addChild(t);
+    this._textPoolUsed++;
+    return t;
+  }
+
+  private _reclaimPool(): void {
+    for (let i = this._textPoolUsed; i < this._textPool.length; i++) {
+      this._textPool[i].visible = false;
+    }
   }
 
   protected redraw(): void {
@@ -57,14 +81,14 @@ export class NervPieChart extends NervBase<NervPieChartProps> {
     const donutW = p.donutWidth ?? 20;
     const innerR = isDonut ? Math.max(0, r - donutW) : 0;
 
-    // Clean up text nodes
-    for (const t of this._textNodes) { this.removeChild(t); t.destroy(); }
-    this._textNodes = [];
-
+    this._textPoolUsed = 0;
     this._segments.clear();
 
     const total = data.reduce((sum, d) => sum + d.value, 0);
-    if (total <= 0 || data.length === 0) return;
+    if (total <= 0 || data.length === 0) {
+      this._reclaimPool();
+      return;
+    }
 
     let currentAngle = -Math.PI / 2; // start at top
 
@@ -132,7 +156,7 @@ export class NervPieChart extends NervBase<NervPieChartProps> {
         const pct = Math.round((d.value / total) * 100);
         const labelStr = `${d.label} ${pct}%`;
 
-        const lt = TextRenderer.create({
+        const lt = this._acquireText({
           text: labelStr,
           role: 'mono',
           size: theme.fontSizes.xs,
@@ -141,16 +165,15 @@ export class NervPieChart extends NervBase<NervPieChartProps> {
         });
         lt.x = lx - lt.width / 2;
         lt.y = ly - lt.height / 2;
-        this.addChild(lt);
-        this._textNodes.push(lt);
       }
 
       currentAngle = endAngle;
     }
+
+    this._reclaimPool();
   }
 
   protected onDispose(): void {
-    this._segments.destroy();
-    for (const t of this._textNodes) t.destroy();
+    // No manual child destruction -- NervBase.destroy() handles children.
   }
 }

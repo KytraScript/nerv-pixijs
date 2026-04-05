@@ -17,10 +17,10 @@ export interface MonitorOverlayProps extends NervBaseProps {
 
 export class MonitorOverlay extends NervBase<MonitorOverlayProps> {
   private _frame = new Graphics();
-  private _tlText: Text | null = null;
-  private _trText: Text | null = null;
-  private _blText: Text | null = null;
-  private _brText: Text | null = null;
+  private _tlText!: Text;
+  private _trText!: Text;
+  private _blText!: Text;
+  private _brText!: Text;
 
   protected defaultProps(): MonitorOverlayProps {
     return {
@@ -29,12 +29,31 @@ export class MonitorOverlay extends NervBase<MonitorOverlayProps> {
       color: 'orange',
       framePadding: 8,
       frameCornerSize: 24,
+      interactive: false,
     };
   }
 
   protected onInit(): void {
     this.addChild(this._frame);
     this.eventMode = 'none';
+
+    const theme = this.theme;
+    const textSize = theme.fontSizes.xs;
+    const textColor = theme.semantic.textPrimary;
+    const textAlpha = 0.7;
+
+    // Create text objects once; toggle visibility in redraw
+    this._tlText = TextRenderer.create({ text: '', role: 'mono', size: textSize, color: textColor, alpha: textAlpha });
+    this._trText = TextRenderer.create({ text: '', role: 'mono', size: textSize, color: textColor, alpha: textAlpha });
+    this._blText = TextRenderer.create({ text: '', role: 'mono', size: textSize, color: textColor, alpha: textAlpha });
+    this._brText = TextRenderer.create({ text: '', role: 'mono', size: textSize, color: textColor, alpha: textAlpha });
+
+    this._tlText.visible = false;
+    this._trText.visible = false;
+    this._blText.visible = false;
+    this._brText.visible = false;
+
+    this.addChild(this._tlText, this._trText, this._blText, this._brText);
   }
 
   getPreferredSize(): Size {
@@ -52,9 +71,6 @@ export class MonitorOverlay extends NervBase<MonitorOverlayProps> {
     const accent = theme.colorForAccent(p.color ?? 'orange');
     const pad = p.framePadding ?? 8;
     const cs = p.frameCornerSize ?? 24;
-
-    // Clear old texts
-    this._clearTexts();
 
     // Draw frame
     this._frame.clear();
@@ -107,76 +123,52 @@ export class MonitorOverlay extends NervBase<MonitorOverlayProps> {
 
     this._frame.stroke();
 
-    const textSize = theme.fontSizes.xs;
-    const textColor = accent;
-    const textAlpha = 0.7;
-
     // Top-left text
     if (p.topLeft) {
-      this._tlText = TextRenderer.create({
-        text: p.topLeft,
-        role: 'mono',
-        size: textSize,
-        color: textColor,
-        alpha: textAlpha,
-      });
+      TextRenderer.updateText(this._tlText, p.topLeft, true);
+      TextRenderer.updateStyle(this._tlText, { color: accent, alpha: 0.7 });
       this._tlText.x = pad + 4;
       this._tlText.y = pad + 4;
-      this.addChild(this._tlText);
+      this._tlText.visible = true;
+    } else {
+      this._tlText.visible = false;
     }
 
     // Top-right text
     if (p.topRight) {
-      this._trText = TextRenderer.create({
-        text: p.topRight,
-        role: 'mono',
-        size: textSize,
-        color: textColor,
-        alpha: textAlpha,
-      });
+      TextRenderer.updateText(this._trText, p.topRight, true);
+      TextRenderer.updateStyle(this._trText, { color: accent, alpha: 0.7 });
       this._trText.x = w - pad - 4 - this._trText.width;
       this._trText.y = pad + 4;
-      this.addChild(this._trText);
+      this._trText.visible = true;
+    } else {
+      this._trText.visible = false;
     }
 
     // Bottom-left text
     if (p.bottomLeft) {
-      this._blText = TextRenderer.create({
-        text: p.bottomLeft,
-        role: 'mono',
-        size: textSize,
-        color: textColor,
-        alpha: textAlpha,
-      });
+      TextRenderer.updateText(this._blText, p.bottomLeft, true);
+      TextRenderer.updateStyle(this._blText, { color: accent, alpha: 0.7 });
       this._blText.x = pad + 4;
       this._blText.y = h - pad - 4 - this._blText.height;
-      this.addChild(this._blText);
+      this._blText.visible = true;
+    } else {
+      this._blText.visible = false;
     }
 
     // Bottom-right text
     if (p.bottomRight) {
-      this._brText = TextRenderer.create({
-        text: p.bottomRight,
-        role: 'mono',
-        size: textSize,
-        color: textColor,
-        alpha: textAlpha,
-      });
+      TextRenderer.updateText(this._brText, p.bottomRight, true);
+      TextRenderer.updateStyle(this._brText, { color: accent, alpha: 0.7 });
       this._brText.x = w - pad - 4 - this._brText.width;
       this._brText.y = h - pad - 4 - this._brText.height;
-      this.addChild(this._brText);
+      this._brText.visible = true;
+    } else {
+      this._brText.visible = false;
     }
   }
 
-  private _clearTexts(): void {
-    if (this._tlText) { this.removeChild(this._tlText); this._tlText.destroy(); this._tlText = null; }
-    if (this._trText) { this.removeChild(this._trText); this._trText.destroy(); this._trText = null; }
-    if (this._blText) { this.removeChild(this._blText); this._blText.destroy(); this._blText = null; }
-    if (this._brText) { this.removeChild(this._brText); this._brText.destroy(); this._brText = null; }
-  }
-
   protected onDispose(): void {
-    this._clearTexts();
-    this._frame.destroy();
+    // All children are auto-destroyed by NervBase.destroy({ children: true }).
   }
 }

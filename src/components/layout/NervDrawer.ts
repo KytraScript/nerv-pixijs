@@ -1,4 +1,4 @@
-import { Container, Graphics } from 'pixi.js';
+import { Container, Graphics, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps, NervBaseState } from '../../core/NervBase';
 import { AnimationManager, Easing } from '../../core/AnimationManager';
@@ -174,13 +174,12 @@ export class NervDrawer extends NervBase<NervDrawerProps, NervDrawerState> {
     this._contentArea.y = contentPad;
 
     this._drawerContainer.visible = isOpen;
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= containerW && y >= 0 && y <= containerH };
+    this.hitArea = new Rectangle(0, 0, containerW, containerH);
   }
 
   protected onDispose(): void {
-    this._scrim.destroy();
-    this._panel?.destroy({ children: true });
-    this._contentArea.destroy({ children: true });
-    this._drawerContainer.destroy({ children: true });
+    // Only clean up event listeners; all children are auto-destroyed
+    // by NervBase.destroy({ children: true }).
+    this._scrim.removeAllListeners();
   }
 }

@@ -1,4 +1,4 @@
-import { Container, Graphics, Ticker } from 'pixi.js';
+import { Container, Graphics, Rectangle, Ticker } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps, NervBaseState } from '../../core/NervBase';
 import type { NervColor, Size } from '../../core/types';
@@ -178,13 +178,12 @@ export class TargetingContainer extends NervBase<TargetingContainerProps, Target
     // Draw brackets
     this._drawBrackets();
 
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= w && y >= 0 && y <= h };
+    this.hitArea = new Rectangle(0, 0, w, h);
   }
 
   protected onDispose(): void {
+    // Only clean up the ticker callback; all children are auto-destroyed
+    // by NervBase.destroy({ children: true }).
     this._stopAnimation();
-    this._bg.destroy();
-    this._brackets.destroy();
-    this._contentArea.destroy({ children: true });
   }
 }

@@ -1,4 +1,4 @@
-import { Container } from 'pixi.js';
+import { Container, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps } from '../../core/NervBase';
 import type { Size } from '../../core/types';
@@ -83,10 +83,10 @@ export class NervGrid extends NervBase<NervGridProps> {
     }
 
     const { width: totalW, height: totalH } = this.getPreferredSize();
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= totalW && y >= 0 && y <= totalH };
+    this.hitArea = new Rectangle(0, 0, totalW, totalH);
   }
 
   protected onDispose(): void {
-    this._contentContainer.destroy({ children: true });
+    // All children are auto-destroyed by NervBase.destroy({ children: true }).
   }
 }

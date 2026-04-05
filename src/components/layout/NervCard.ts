@@ -1,4 +1,4 @@
-import { Container, Graphics } from 'pixi.js';
+import { Container, Graphics, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps } from '../../core/NervBase';
 import { TextRenderer } from '../../core/TextRenderer';
@@ -23,10 +23,10 @@ export interface NervCardProps extends NervBaseProps {
 
 export class NervCard extends NervBase<NervCardProps> {
   private _panel: NervPanel | null = null;
-  private _eyebrowText: Text | null = null;
-  private _titleText: Text | null = null;
-  private _subtitleText: Text | null = null;
-  private _footerText: Text | null = null;
+  private _eyebrowText!: Text;
+  private _titleText!: Text;
+  private _subtitleText!: Text;
+  private _footerText!: Text;
   private _footerLine = new Graphics();
   private _contentArea = new Container();
   private _alertStripe = new Graphics();
@@ -42,7 +42,43 @@ export class NervCard extends NervBase<NervCardProps> {
   }
 
   protected onInit(): void {
+    const theme = this.theme;
+    // Create text objects once with empty text; toggle visibility in redraw
+    this._eyebrowText = TextRenderer.create({
+      text: '',
+      role: 'mono',
+      size: theme.fontSizes.xs,
+      color: theme.semantic.textPrimary,
+      alpha: 0.7,
+      uppercase: true,
+    });
+    this._titleText = TextRenderer.create({
+      text: '',
+      role: 'display',
+      size: theme.fontSizes.xl,
+      color: theme.semantic.textPrimary,
+    });
+    this._subtitleText = TextRenderer.create({
+      text: '',
+      role: 'body',
+      size: theme.fontSizes.sm,
+      color: theme.semantic.textSecondary,
+      uppercase: false,
+    });
+    this._footerText = TextRenderer.create({
+      text: '',
+      role: 'mono',
+      size: theme.fontSizes.xs,
+      color: theme.semantic.textMuted,
+    });
+
+    this._eyebrowText.visible = false;
+    this._titleText.visible = false;
+    this._subtitleText.visible = false;
+    this._footerText.visible = false;
+
     this.addChild(this._alertStripe, this._footerLine, this._contentArea);
+    this.addChild(this._eyebrowText, this._titleText, this._subtitleText, this._footerText);
   }
 
   getPreferredSize(): Size {
@@ -102,56 +138,48 @@ export class NervCard extends NervBase<NervCardProps> {
       this._alertStripe.fill({ color: theme.colors.red, alpha: 0.9 });
     }
 
-    // Clear old text objects
-    this._clearTexts();
-
     let cursorY = pad;
 
     // Eyebrow
     if (p.eyebrow) {
-      this._eyebrowText = TextRenderer.create({
-        text: p.eyebrow,
-        role: 'mono',
-        size: theme.fontSizes.xs,
-        color: accent,
-        alpha: 0.7,
-        uppercase: true,
-      });
+      TextRenderer.updateText(this._eyebrowText, p.eyebrow, true);
+      TextRenderer.updateStyle(this._eyebrowText, { color: accent, alpha: 0.7 });
       this._eyebrowText.x = pad;
       this._eyebrowText.y = cursorY;
-      this.addChild(this._eyebrowText);
+      this._eyebrowText.visible = true;
       cursorY += this._eyebrowText.height + theme.spacing.xs;
+    } else {
+      this._eyebrowText.visible = false;
     }
 
     // Title
     if (p.title) {
-      this._titleText = TextRenderer.create({
-        text: p.title,
-        role: 'display',
-        size: theme.fontSizes.xl,
+      TextRenderer.updateText(this._titleText, p.title);
+      TextRenderer.updateStyle(this._titleText, {
         color: isAlert ? theme.colors.red : theme.semantic.textPrimary,
-        maxWidth: w - pad * 2,
       });
+      (this._titleText.style as { wordWrap: boolean; wordWrapWidth: number }).wordWrap = true;
+      (this._titleText.style as { wordWrapWidth: number }).wordWrapWidth = w - pad * 2;
       this._titleText.x = pad;
       this._titleText.y = cursorY;
-      this.addChild(this._titleText);
+      this._titleText.visible = true;
       cursorY += this._titleText.height + theme.spacing.xxs;
+    } else {
+      this._titleText.visible = false;
     }
 
     // Subtitle
     if (p.subtitle) {
-      this._subtitleText = TextRenderer.create({
-        text: p.subtitle,
-        role: 'body',
-        size: theme.fontSizes.sm,
-        color: theme.semantic.textSecondary,
-        uppercase: false,
-        maxWidth: w - pad * 2,
-      });
+      TextRenderer.updateText(this._subtitleText, p.subtitle, false);
+      TextRenderer.updateStyle(this._subtitleText, { color: theme.semantic.textSecondary });
+      (this._subtitleText.style as { wordWrap: boolean; wordWrapWidth: number }).wordWrap = true;
+      (this._subtitleText.style as { wordWrapWidth: number }).wordWrapWidth = w - pad * 2;
       this._subtitleText.x = pad;
       this._subtitleText.y = cursorY;
-      this.addChild(this._subtitleText);
+      this._subtitleText.visible = true;
       cursorY += this._subtitleText.height + theme.spacing.sm;
+    } else {
+      this._subtitleText.visible = false;
     }
 
     // Content area positioning
@@ -184,32 +212,21 @@ export class NervCard extends NervBase<NervCardProps> {
       this._footerLine.lineTo(w - pad, footerY);
       this._footerLine.stroke();
 
-      this._footerText = TextRenderer.create({
-        text: p.footer,
-        role: 'mono',
-        size: theme.fontSizes.xs,
-        color: theme.semantic.textMuted,
-      });
+      TextRenderer.updateText(this._footerText, p.footer, true);
+      TextRenderer.updateStyle(this._footerText, { color: theme.semantic.textMuted });
       this._footerText.x = pad;
       this._footerText.y = footerY + theme.spacing.xs;
-      this.addChild(this._footerText);
+      this._footerText.visible = true;
+    } else {
+      this._footerText.visible = false;
     }
 
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= w && y >= 0 && y <= h };
-  }
-
-  private _clearTexts(): void {
-    if (this._eyebrowText) { this.removeChild(this._eyebrowText); this._eyebrowText.destroy(); this._eyebrowText = null; }
-    if (this._titleText) { this.removeChild(this._titleText); this._titleText.destroy(); this._titleText = null; }
-    if (this._subtitleText) { this.removeChild(this._subtitleText); this._subtitleText.destroy(); this._subtitleText = null; }
-    if (this._footerText) { this.removeChild(this._footerText); this._footerText.destroy(); this._footerText = null; }
+    this.hitArea = new Rectangle(0, 0, w, h);
   }
 
   protected onDispose(): void {
-    this._clearTexts();
-    this._footerLine.destroy();
-    this._alertStripe.destroy();
-    this._contentArea.destroy({ children: true });
-    this._panel?.destroy({ children: true });
+    // Only clean up non-child resources.
+    // All children (panel, texts, graphics, contentArea) are auto-destroyed
+    // by NervBase.destroy({ children: true }).
   }
 }

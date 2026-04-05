@@ -1,4 +1,4 @@
-import { Graphics, FederatedPointerEvent } from 'pixi.js';
+import { Graphics, FederatedPointerEvent, Rectangle, TextStyle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps } from '../../core/NervBase';
 import { TextRenderer } from '../../core/TextRenderer';
@@ -32,7 +32,10 @@ export class NervSlider extends NervBase<NervSliderProps> {
   }
 
   protected onInit(): void {
-    this.addChild(this._track, this._fill, this._ticks, this._thumb);
+    // Create value label once; updated in-place in redraw()
+    this._valueLabel = TextRenderer.create({ text: '', role: 'mono', size: this.theme.fontSizes.sm, color: 0xffffff });
+    this._valueLabel.visible = false;
+    this.addChild(this._track, this._fill, this._ticks, this._thumb, this._valueLabel);
 
     const onDrag = (e: FederatedPointerEvent) => {
       if (!this._dragging) return;
@@ -91,7 +94,7 @@ export class NervSlider extends NervBase<NervSliderProps> {
     this._track.cursor = 'pointer';
     this._track.rect(0, trackY, tw, trackH);
     this._track.fill({ color: theme.semantic.borderDefault, alpha: 0.4 });
-    this._track.hitArea = { contains: (x: number, y: number) => x >= -4 && x <= tw + 4 && y >= trackY - 8 && y <= trackY + trackH + 8 };
+    this._track.hitArea = new Rectangle(-4, trackY - 8, tw + 8, trackH + 16);
 
     // Fill
     this._fill.clear();
@@ -127,30 +130,25 @@ export class NervSlider extends NervBase<NervSliderProps> {
     this._thumb.lineTo(thumbX - thumbR, trackY + trackH / 2);
     this._thumb.closePath();
     this._thumb.fill({ color: accent });
-    this._thumb.hitArea = { contains: (x: number, y: number) => Math.abs(x - thumbX) < 12 && Math.abs(y - trackY) < 16 };
+    this._thumb.hitArea = new Rectangle(thumbX - 12, trackY - 16, 24, 32);
 
-    // Value label
-    if (this._valueLabel) { this._valueLabel.destroy(); this.removeChild(this._valueLabel); this._valueLabel = null; }
+    // Value label -- update in-place
     if (p.showValue) {
-      this._valueLabel = TextRenderer.create({
-        text: String(value),
-        role: 'mono',
-        size: theme.fontSizes.sm,
-        color: accent,
-      });
-      this._valueLabel.x = Math.max(0, Math.min(tw - this._valueLabel.width, thumbX - this._valueLabel.width / 2));
-      this._valueLabel.y = 0;
-      this.addChild(this._valueLabel);
+      this._valueLabel!.visible = true;
+      this._valueLabel!.text = String(value).toUpperCase();
+      (this._valueLabel!.style as TextStyle).fill = accent;
+      (this._valueLabel!.style as TextStyle).fontSize = theme.fontSizes.sm;
+      this._valueLabel!.x = Math.max(0, Math.min(tw - this._valueLabel!.width, thumbX - this._valueLabel!.width / 2));
+      this._valueLabel!.y = 0;
+    } else {
+      this._valueLabel!.visible = false;
     }
 
-    this.hitArea = { contains: (x: number, y: number) => x >= -8 && x <= tw + 8 && y >= 0 && y <= (p.showValue ? 36 : 20) };
+    this.hitArea = new Rectangle(-8, 0, tw + 16, p.showValue ? 36 : 20);
   }
 
   protected onDispose(): void {
-    this._track.destroy();
-    this._fill.destroy();
-    this._thumb.destroy();
-    this._ticks.destroy();
-    this._valueLabel?.destroy();
+    // NervBase.destroy() passes { children: true }, so child Graphics/Text
+    // are auto-destroyed. Nothing extra to clean up here.
   }
 }

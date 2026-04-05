@@ -1,4 +1,4 @@
-import { Graphics, Container } from 'pixi.js';
+import { Graphics, Container, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps } from '../../core/NervBase';
 import { TextRenderer } from '../../core/TextRenderer';
@@ -88,12 +88,12 @@ export class NervTerminalDisplay extends NervBase<NervTerminalDisplayProps> {
     this._mask.rect(pad, pad, w - pad * 2, h - pad * 2);
     this._mask.fill({ color: 0xFFFFFF });
 
-    // Clear old text objects
+    // Clear old text objects -- these are pooled per-redraw, must be destroyed manually
     for (const t of this._lineTexts) {
+      this._lineContainer.removeChild(t);
       t.destroy();
     }
     this._lineTexts.length = 0;
-    this._lineContainer.removeChildren();
 
     // Auto-scroll
     const visibleCount = Math.floor((h - pad * 2) / lineHeight);
@@ -138,7 +138,7 @@ export class NervTerminalDisplay extends NervBase<NervTerminalDisplayProps> {
       this._lineTexts.push(text);
     }
 
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= w && y >= 0 && y <= h };
+    this.hitArea = new Rectangle(0, 0, w, h);
   }
 
   /** Append a line and trigger redraw. */
@@ -154,11 +154,8 @@ export class NervTerminalDisplay extends NervBase<NervTerminalDisplayProps> {
   }
 
   protected onDispose(): void {
-    for (const t of this._lineTexts) t.destroy();
-    this._lineTexts.length = 0;
-    this._bg.destroy();
-    this._border.destroy();
-    this._mask.destroy();
-    this._lineContainer.destroy({ children: true });
+    // Only clean up the wheel event listener; all children are auto-destroyed
+    // by NervBase.destroy({ children: true }).
+    this.removeAllListeners('wheel');
   }
 }

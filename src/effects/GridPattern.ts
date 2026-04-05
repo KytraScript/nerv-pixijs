@@ -76,7 +76,6 @@ export class GridPattern extends Container {
   }
 
   destroy(): void {
-    this._gfx.destroy();
-    super.destroy();
+    super.destroy({ children: true });
   }
 }

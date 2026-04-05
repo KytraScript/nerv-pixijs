@@ -17,7 +17,8 @@ export class NervSyncRatioChart extends NervBase<NervSyncRatioChartProps> {
   private _barA = new Graphics();
   private _barB = new Graphics();
   private _divider = new Graphics();
-  private _textNodes: Text[] = [];
+  private _textPool: Text[] = [];
+  private _textPoolUsed = 0;
 
   protected defaultProps(): NervSyncRatioChartProps {
     return {
@@ -28,6 +29,7 @@ export class NervSyncRatioChart extends NervBase<NervSyncRatioChartProps> {
       color: 'orange',
       width: 260,
       height: 40,
+      interactive: false,
     };
   }
 
@@ -42,6 +44,28 @@ export class NervSyncRatioChart extends NervBase<NervSyncRatioChartProps> {
     };
   }
 
+  private _acquireText(opts: Parameters<typeof TextRenderer.create>[0]): Text {
+    if (this._textPoolUsed < this._textPool.length) {
+      const t = this._textPool[this._textPoolUsed];
+      t.visible = true;
+      TextRenderer.updateText(t, opts.text, opts.uppercase ?? true);
+      TextRenderer.updateStyle(t, { color: opts.color, size: opts.size, alpha: opts.alpha });
+      this._textPoolUsed++;
+      return t;
+    }
+    const t = TextRenderer.create(opts);
+    this._textPool.push(t);
+    this.addChild(t);
+    this._textPoolUsed++;
+    return t;
+  }
+
+  private _reclaimPool(): void {
+    for (let i = this._textPoolUsed; i < this._textPool.length; i++) {
+      this._textPool[i].visible = false;
+    }
+  }
+
   protected redraw(): void {
     const p = this._props;
     const theme = this.theme;
@@ -52,15 +76,16 @@ export class NervSyncRatioChart extends NervBase<NervSyncRatioChartProps> {
     const total = vA + vB;
     const accent = theme.colorForAccent(p.color ?? 'orange');
 
-    // Clean up text
-    for (const t of this._textNodes) { this.removeChild(t); t.destroy(); }
-    this._textNodes = [];
+    this._textPoolUsed = 0;
 
     this._barA.clear();
     this._barB.clear();
     this._divider.clear();
 
-    if (total <= 0) return;
+    if (total <= 0) {
+      this._reclaimPool();
+      return;
+    }
 
     const ratioA = vA / total;
     const labelH = theme.fontSizes.sm + theme.spacing.xs;
@@ -85,7 +110,7 @@ export class NervSyncRatioChart extends NervBase<NervSyncRatioChartProps> {
     this._divider.stroke();
 
     // Label A (top left)
-    const ltA = TextRenderer.create({
+    const ltA = this._acquireText({
       text: `${p.labelA ?? 'A'}`,
       role: 'mono',
       size: theme.fontSizes.xs,
@@ -93,11 +118,9 @@ export class NervSyncRatioChart extends NervBase<NervSyncRatioChartProps> {
     });
     ltA.x = theme.spacing.xs;
     ltA.y = 0;
-    this.addChild(ltA);
-    this._textNodes.push(ltA);
 
     // Value A (inside left bar)
-    const vtA = TextRenderer.create({
+    const vtA = this._acquireText({
       text: `${Math.round(ratioA * 100)}%`,
       role: 'mono',
       size: theme.fontSizes.sm,
@@ -105,11 +128,9 @@ export class NervSyncRatioChart extends NervBase<NervSyncRatioChartProps> {
     });
     vtA.x = Math.max(2, barWA / 2 - vtA.width / 2);
     vtA.y = barY + barH / 2 - vtA.height / 2;
-    this.addChild(vtA);
-    this._textNodes.push(vtA);
 
     // Label B (top right)
-    const ltB = TextRenderer.create({
+    const ltB = this._acquireText({
       text: `${p.labelB ?? 'B'}`,
       role: 'mono',
       size: theme.fontSizes.xs,
@@ -117,11 +138,9 @@ export class NervSyncRatioChart extends NervBase<NervSyncRatioChartProps> {
     });
     ltB.x = w - ltB.width - theme.spacing.xs;
     ltB.y = 0;
-    this.addChild(ltB);
-    this._textNodes.push(ltB);
 
     // Value B (inside right bar)
-    const vtB = TextRenderer.create({
+    const vtB = this._acquireText({
       text: `${Math.round((1 - ratioA) * 100)}%`,
       role: 'mono',
       size: theme.fontSizes.sm,
@@ -129,11 +148,9 @@ export class NervSyncRatioChart extends NervBase<NervSyncRatioChartProps> {
     });
     vtB.x = Math.min(w - vtB.width - 2, barWA + barWB / 2 - vtB.width / 2);
     vtB.y = barY + barH / 2 - vtB.height / 2;
-    this.addChild(vtB);
-    this._textNodes.push(vtB);
 
     // Bottom labels: raw values
-    const rawA = TextRenderer.create({
+    const rawA = this._acquireText({
       text: String(vA),
       role: 'mono',
       size: theme.fontSizes.xs,
@@ -141,10 +158,8 @@ export class NervSyncRatioChart extends NervBase<NervSyncRatioChartProps> {
     });
     rawA.x = theme.spacing.xs;
     rawA.y = barY + barH + theme.spacing.xxs;
-    this.addChild(rawA);
-    this._textNodes.push(rawA);
 
-    const rawB = TextRenderer.create({
+    const rawB = this._acquireText({
       text: String(vB),
       role: 'mono',
       size: theme.fontSizes.xs,
@@ -152,14 +167,11 @@ export class NervSyncRatioChart extends NervBase<NervSyncRatioChartProps> {
     });
     rawB.x = w - rawB.width - theme.spacing.xs;
     rawB.y = barY + barH + theme.spacing.xxs;
-    this.addChild(rawB);
-    this._textNodes.push(rawB);
+
+    this._reclaimPool();
   }
 
   protected onDispose(): void {
-    this._barA.destroy();
-    this._barB.destroy();
-    this._divider.destroy();
-    for (const t of this._textNodes) t.destroy();
+    // No manual child destruction -- NervBase.destroy() handles children.
   }
 }

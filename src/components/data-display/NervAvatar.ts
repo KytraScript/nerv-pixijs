@@ -14,7 +14,7 @@ export interface NervAvatarProps extends NervBaseProps {
 export class NervAvatar extends NervBase<NervAvatarProps> {
   private _bg = new Graphics();
   private _border = new Graphics();
-  private _label: Text | null = null;
+  private _label!: Text;
 
   protected defaultProps(): NervAvatarProps {
     return {
@@ -25,7 +25,16 @@ export class NervAvatar extends NervBase<NervAvatarProps> {
   }
 
   protected onInit(): void {
-    this.addChild(this._bg, this._border);
+    const theme = this.theme;
+    // Create label text once; update in redraw
+    this._label = TextRenderer.create({
+      text: '',
+      role: 'display',
+      size: theme.fontSizes.sm,
+      color: theme.semantic.textPrimary,
+    });
+
+    this.addChild(this._bg, this._border, this._label);
   }
 
   getPreferredSize(): Size {
@@ -55,21 +64,15 @@ export class NervAvatar extends NervBase<NervAvatarProps> {
     this._border.stroke();
 
     // Initials
-    if (this._label) { this._label.destroy(); this.removeChild(this._label); }
-
     const initials = (p.initials ?? '??').slice(0, 2).toUpperCase();
     const fontSize = Math.max(8, Math.round(size * 0.35));
-    this._label = TextRenderer.create({
-      text: initials,
-      role: 'display',
-      size: fontSize,
-      color: accent,
-    });
+    TextRenderer.updateText(this._label, initials, false); // Already uppercased
+    TextRenderer.updateStyle(this._label, { color: accent, size: fontSize });
     this._label.x = Math.round(cx - this._label.width / 2);
     this._label.y = Math.round(cy - this._label.height / 2);
-    this.addChild(this._label);
 
     this.cursor = 'default';
+    // Avatar is circular; use a custom contains for circular hit testing
     this.hitArea = {
       contains: (x: number, y: number) => {
         const dx = x - cx;
@@ -80,8 +83,6 @@ export class NervAvatar extends NervBase<NervAvatarProps> {
   }
 
   protected onDispose(): void {
-    this._bg.destroy();
-    this._border.destroy();
-    this._label?.destroy();
+    // All children are auto-destroyed by NervBase.destroy({ children: true }).
   }
 }

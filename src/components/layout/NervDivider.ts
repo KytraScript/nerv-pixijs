@@ -30,6 +30,7 @@ export class NervDivider extends NervBase<NervDividerProps> {
       thickness: 1,
       spacing: 12,
       dashed: false,
+      interactive: false,
     };
   }
 
@@ -57,7 +58,7 @@ export class NervDivider extends NervBase<NervDividerProps> {
     const spacing = p.spacing ?? 12;
     const isVert = p.direction === 'vertical';
 
-    // Clean up previous
+    // Clean up previous line children (they are NervBase, will be recreated)
     this._cleanup();
 
     const lineColor = p.color;
@@ -70,13 +71,20 @@ export class NervDivider extends NervBase<NervDividerProps> {
 
     if (p.label && !isVert) {
       // Draw label centered with lines on each side
-      this._labelText = TextRenderer.create({
-        text: p.label,
-        role: 'mono',
-        size: theme.fontSizes.xs,
-        color: p.labelColor ?? theme.semantic.textMuted,
-        uppercase: true,
-      });
+      if (!this._labelText) {
+        this._labelText = TextRenderer.create({
+          text: p.label,
+          role: 'mono',
+          size: theme.fontSizes.xs,
+          color: p.labelColor ?? theme.semantic.textMuted,
+          uppercase: true,
+        });
+        this.addChild(this._labelText);
+      } else {
+        TextRenderer.updateText(this._labelText, p.label, true);
+        TextRenderer.updateStyle(this._labelText, { color: p.labelColor ?? theme.semantic.textMuted });
+      }
+      this._labelText.visible = true;
 
       const labelW = this._labelText.width;
       const labelGap = theme.spacing.sm;
@@ -90,13 +98,14 @@ export class NervDivider extends NervBase<NervDividerProps> {
 
       this._labelText.x = leftLen + labelGap;
       this._labelText.y = spacing;
-      this.addChild(this._labelText);
 
       this._lineRight = new NervLine({ ...lineProps, length: rightLen });
       this._lineRight.x = leftLen + labelGap + labelW + labelGap;
       this._lineRight.y = spacing + Math.round(this._labelText.height / 2);
       this.addChild(this._lineRight);
     } else {
+      if (this._labelText) this._labelText.visible = false;
+
       // Simple single line
       this._lineFull = new NervLine({ ...lineProps, length: len });
       if (isVert) {
@@ -111,13 +120,14 @@ export class NervDivider extends NervBase<NervDividerProps> {
   }
 
   private _cleanup(): void {
+    // Remove and destroy line children (NervLine instances that get recreated each redraw)
     if (this._lineLeft) { this.removeChild(this._lineLeft); this._lineLeft.destroy({ children: true }); this._lineLeft = null; }
     if (this._lineRight) { this.removeChild(this._lineRight); this._lineRight.destroy({ children: true }); this._lineRight = null; }
     if (this._lineFull) { this.removeChild(this._lineFull); this._lineFull.destroy({ children: true }); this._lineFull = null; }
-    if (this._labelText) { this.removeChild(this._labelText); this._labelText.destroy(); this._labelText = null; }
   }
 
   protected onDispose(): void {
-    this._cleanup();
+    // All children (lines, label text) are auto-destroyed
+    // by NervBase.destroy({ children: true }).
   }
 }

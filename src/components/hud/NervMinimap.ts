@@ -1,4 +1,4 @@
-import { Graphics, Container } from 'pixi.js';
+import { Graphics, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps, NervBaseState } from '../../core/NervBase';
 import type { NervColor, Size } from '../../core/types';
@@ -126,14 +126,10 @@ export class NervMinimap extends NervBase<NervMinimapProps> {
     this._border.moveTo(w - cs, h); this._border.lineTo(w, h); this._border.lineTo(w, h - cs);
     this._border.stroke();
 
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= w && y >= 0 && y <= h };
+    this.hitArea = new Rectangle(0, 0, w, h);
   }
 
   protected onDispose(): void {
-    this._bg.destroy();
-    this._border.destroy();
-    this._viewportRect.destroy();
-    this._markerGraphics.destroy();
-    this._grid.destroy();
+    // No manual child destruction -- NervBase.destroy() handles children.
   }
 }

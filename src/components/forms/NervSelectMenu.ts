@@ -1,4 +1,4 @@
-import { Graphics, Container } from 'pixi.js';
+import { Graphics, Container, Rectangle, TextStyle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps } from '../../core/NervBase';
 import { TextRenderer } from '../../core/TextRenderer';
@@ -45,7 +45,12 @@ export class NervSelectMenu extends NervBase<NervSelectMenuProps, SelectState> {
   }
 
   protected onInit(): void {
-    this.addChild(this._trigger, this._arrow);
+    // Create persistent text objects once; updated in-place in redraw()
+    this._labelText = TextRenderer.create({ text: '', role: 'mono', size: 10, color: 0x888888 });
+    this._labelText.visible = false;
+    this._triggerText = TextRenderer.create({ text: '', role: 'mono', size: 12, color: 0xffffff });
+
+    this.addChild(this._trigger, this._arrow, this._labelText, this._triggerText);
 
     this.on('pointerup', () => {
       if (this.isDisabled) return;
@@ -69,13 +74,15 @@ export class NervSelectMenu extends NervBase<NervSelectMenuProps, SelectState> {
     const triggerY = labelH;
     const selected = (p.options ?? []).find(o => o.value === p.selected);
 
-    // Label
-    if (this._labelText) { this._labelText.destroy(); this.removeChild(this._labelText); this._labelText = null; }
+    // Label -- update in-place
     if (hasLabel) {
-      this._labelText = TextRenderer.create({ text: `// ${p.selectLabel}`, role: 'mono', size: 10, color: theme.semantic.textMuted });
-      this._labelText.x = 2;
-      this._labelText.y = 0;
-      this.addChild(this._labelText);
+      this._labelText!.visible = true;
+      this._labelText!.text = `// ${p.selectLabel}`.toUpperCase();
+      (this._labelText!.style as TextStyle).fill = theme.semantic.textMuted;
+      this._labelText!.x = 2;
+      this._labelText!.y = 0;
+    } else {
+      this._labelText!.visible = false;
     }
 
     // Trigger
@@ -86,18 +93,12 @@ export class NervSelectMenu extends NervBase<NervSelectMenuProps, SelectState> {
     this._trigger.rect(0, triggerY, w, triggerH);
     this._trigger.stroke();
 
-    // Trigger text
-    if (this._triggerText) { this._triggerText.destroy(); this.removeChild(this._triggerText); this._triggerText = null; }
+    // Trigger text -- update in-place
     const displayText = selected?.label ?? p.placeholder ?? 'SELECT...';
-    this._triggerText = TextRenderer.create({
-      text: displayText,
-      role: 'mono',
-      size: 12,
-      color: selected ? theme.semantic.textPrimary : theme.semantic.textMuted,
-    });
-    this._triggerText.x = 8;
-    this._triggerText.y = triggerY + Math.round((triggerH - 12) / 2);
-    this.addChild(this._triggerText);
+    this._triggerText!.text = displayText.toUpperCase();
+    (this._triggerText!.style as TextStyle).fill = selected ? theme.semantic.textPrimary : theme.semantic.textMuted;
+    this._triggerText!.x = 8;
+    this._triggerText!.y = triggerY + Math.round((triggerH - 12) / 2);
 
     // Arrow
     this._arrow.clear();
@@ -115,8 +116,8 @@ export class NervSelectMenu extends NervBase<NervSelectMenuProps, SelectState> {
     }
     this._arrow.stroke();
 
-    // Dropdown
-    if (this._dropdown) { this._dropdown.destroy({ children: true }); this.removeChild(this._dropdown); this._dropdown = null; }
+    // Dropdown -- ephemeral, must be removed before recreating
+    if (this._dropdown) { this.removeChild(this._dropdown); this._dropdown.destroy({ children: true }); this._dropdown = null; }
 
     if (this._state.open) {
       const options = p.options ?? [];
@@ -173,7 +174,7 @@ export class NervSelectMenu extends NervBase<NervSelectMenuProps, SelectState> {
           this.setState({ open: false });
           p.onChange?.(opt.value);
         });
-        optContainer.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= w && y >= 0 && y <= optH };
+        optContainer.hitArea = new Rectangle(0, 0, w, optH);
 
         this._dropdown!.addChild(optContainer);
       });
@@ -182,14 +183,11 @@ export class NervSelectMenu extends NervBase<NervSelectMenuProps, SelectState> {
       AnimationManager.fadeIn(this._dropdown, 100);
     }
 
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= w && y >= 0 && y <= triggerY + triggerH };
+    this.hitArea = new Rectangle(0, 0, w, triggerY + triggerH);
   }
 
   protected onDispose(): void {
-    this._trigger.destroy();
-    this._arrow.destroy();
-    this._triggerText?.destroy();
-    this._labelText?.destroy();
-    this._dropdown?.destroy({ children: true });
+    // NervBase.destroy() passes { children: true }, so child Graphics/Text/Container
+    // are auto-destroyed. Nothing extra to clean up here.
   }
 }

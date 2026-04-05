@@ -1,4 +1,4 @@
-import { Graphics, Ticker } from 'pixi.js';
+import { Graphics, Rectangle, Ticker } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps, NervBaseState } from '../../core/NervBase';
 import { TextRenderer } from '../../core/TextRenderer';
@@ -21,9 +21,8 @@ export class NervLoadingScreen extends NervBase<NervLoadingScreenProps, NervLoad
   private _progressBarBg = new Graphics();
   private _progressBarFill = new Graphics();
   private _progressBorder = new Graphics();
-  private _messageText: Text | null = null;
-  private _dotText: Text | null = null;
-  private _percentText: Text | null = null;
+  private _messageText!: Text;
+  private _percentText!: Text;
   private _dotTicker: (() => void) | null = null;
   private _dotElapsed = 0;
 
@@ -41,6 +40,26 @@ export class NervLoadingScreen extends NervBase<NervLoadingScreenProps, NervLoad
 
   protected onInit(): void {
     this.addChild(this._overlay, this._progressBarBg, this._progressBarFill, this._progressBorder);
+
+    // Create persistent Text objects
+    const theme = this.theme;
+    const accent = theme.colorForAccent(this._props.color ?? 'orange');
+
+    this._messageText = TextRenderer.create({
+      text: '',
+      role: 'display',
+      size: theme.fontSizes.lg,
+      color: accent,
+    });
+    this.addChild(this._messageText);
+
+    this._percentText = TextRenderer.create({
+      text: '0%',
+      role: 'mono',
+      size: theme.fontSizes.sm,
+      color: theme.semantic.textSecondary,
+    });
+    this.addChild(this._percentText);
 
     // Animated dots ticker
     this._dotTicker = () => {
@@ -113,42 +132,24 @@ export class NervLoadingScreen extends NervBase<NervLoadingScreenProps, NervLoad
     this._progressBorder.rect(barX, barY, barW, barH);
     this._progressBorder.stroke();
 
-    // Message text
-    if (this._messageText) { this._messageText.destroy(); this.removeChild(this._messageText); }
+    // Message text -- update in place
     const dots = '.'.repeat(this._state.dotFrame);
-    this._messageText = TextRenderer.create({
-      text: (p.message ?? 'LOADING') + dots,
-      role: 'display',
-      size: theme.fontSizes.lg,
-      color: accent,
-    });
+    TextRenderer.updateText(this._messageText, (p.message ?? 'LOADING') + dots);
+    TextRenderer.updateStyle(this._messageText, { color: accent, size: theme.fontSizes.lg });
     this._messageText.x = Math.round(cx - this._messageText.width / 2);
     this._messageText.y = barY - 30;
-    this.addChild(this._messageText);
 
-    // Percentage text
-    if (this._percentText) { this._percentText.destroy(); this.removeChild(this._percentText); }
-    this._percentText = TextRenderer.create({
-      text: `${Math.round(progress * 100)}%`,
-      role: 'mono',
-      size: theme.fontSizes.sm,
-      color: theme.semantic.textSecondary,
-    });
+    // Percentage text -- update in place
+    TextRenderer.updateText(this._percentText, `${Math.round(progress * 100)}%`);
+    TextRenderer.updateStyle(this._percentText, { color: theme.semantic.textSecondary, size: theme.fontSizes.sm });
     this._percentText.x = Math.round(cx - this._percentText.width / 2);
     this._percentText.y = barY + barH + 8;
-    this.addChild(this._percentText);
 
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= screenW && y >= 0 && y <= screenH };
+    this.hitArea = new Rectangle(0, 0, screenW, screenH);
   }
 
   protected onDispose(): void {
+    // Clean up ticker only -- NervBase.destroy() handles children.
     if (this._dotTicker) Ticker.shared.remove(this._dotTicker);
-    this._overlay.destroy();
-    this._progressBarBg.destroy();
-    this._progressBarFill.destroy();
-    this._progressBorder.destroy();
-    this._messageText?.destroy();
-    this._dotText?.destroy();
-    this._percentText?.destroy();
   }
 }

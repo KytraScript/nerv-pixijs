@@ -1,4 +1,4 @@
-import { Graphics } from 'pixi.js';
+import { Graphics, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps } from '../../core/NervBase';
 import { TextRenderer } from '../../core/TextRenderer';
@@ -23,7 +23,8 @@ export interface NervBarChartProps extends NervBaseProps {
 export class NervBarChart extends NervBase<NervBarChartProps> {
   private _bars = new Graphics();
   private _grid = new Graphics();
-  private _textNodes: Text[] = [];
+  private _textPool: Text[] = [];
+  private _textPoolUsed = 0;
 
   protected defaultProps(): NervBarChartProps {
     return {
@@ -35,6 +36,7 @@ export class NervBarChart extends NervBase<NervBarChartProps> {
       width: 300,
       height: 200,
       orientation: 'vertical',
+      interactive: false,
     };
   }
 
@@ -49,6 +51,30 @@ export class NervBarChart extends NervBase<NervBarChartProps> {
     };
   }
 
+  /** Acquire a Text node from the pool, creating one if needed. */
+  private _acquireText(opts: Parameters<typeof TextRenderer.create>[0]): Text {
+    if (this._textPoolUsed < this._textPool.length) {
+      const t = this._textPool[this._textPoolUsed];
+      t.visible = true;
+      TextRenderer.updateText(t, opts.text, opts.uppercase ?? true);
+      TextRenderer.updateStyle(t, { color: opts.color, size: opts.size, alpha: opts.alpha });
+      this._textPoolUsed++;
+      return t;
+    }
+    const t = TextRenderer.create(opts);
+    this._textPool.push(t);
+    this.addChild(t);
+    this._textPoolUsed++;
+    return t;
+  }
+
+  /** Hide all unused pool text nodes. */
+  private _reclaimPool(): void {
+    for (let i = this._textPoolUsed; i < this._textPool.length; i++) {
+      this._textPool[i].visible = false;
+    }
+  }
+
   protected redraw(): void {
     const p = this._props;
     const theme = this.theme;
@@ -59,14 +85,15 @@ export class NervBarChart extends NervBase<NervBarChartProps> {
     const accent = theme.colorForAccent(p.color ?? 'orange');
     const isVertical = (p.orientation ?? 'vertical') === 'vertical';
 
-    // Clean up previous text nodes
-    for (const t of this._textNodes) { this.removeChild(t); t.destroy(); }
-    this._textNodes = [];
+    this._textPoolUsed = 0;
 
     this._grid.clear();
     this._bars.clear();
 
-    if (data.length === 0) return;
+    if (data.length === 0) {
+      this._reclaimPool();
+      return;
+    }
 
     const labelAreaSize = p.showLabels ? theme.fontSizes.sm + theme.spacing.sm : 0;
     const valueAreaSize = p.showValues ? theme.fontSizes.xs + theme.spacing.xxs : 0;
@@ -76,6 +103,8 @@ export class NervBarChart extends NervBase<NervBarChartProps> {
     } else {
       this.drawHorizontal(data, maxVal, w, h, accent, labelAreaSize, valueAreaSize);
     }
+
+    this._reclaimPool();
   }
 
   private drawVertical(
@@ -114,7 +143,7 @@ export class NervBarChart extends NervBase<NervBarChartProps> {
       this._bars.fill({ color: barColor });
 
       if (p.showValues) {
-        const vt = TextRenderer.create({
+        const vt = this._acquireText({
           text: String(d.value),
           role: 'mono',
           size: theme.fontSizes.xs,
@@ -122,12 +151,10 @@ export class NervBarChart extends NervBase<NervBarChartProps> {
         });
         vt.x = x + barWidth / 2 - vt.width / 2;
         vt.y = y - theme.fontSizes.xs - theme.spacing.xxs;
-        this.addChild(vt);
-        this._textNodes.push(vt);
       }
 
       if (p.showLabels) {
-        const lt = TextRenderer.create({
+        const lt = this._acquireText({
           text: d.label,
           role: 'mono',
           size: theme.fontSizes.xs,
@@ -136,8 +163,6 @@ export class NervBarChart extends NervBase<NervBarChartProps> {
         });
         lt.x = x + barWidth / 2 - lt.width / 2;
         lt.y = valueArea + chartH + theme.spacing.xxs;
-        this.addChild(lt);
-        this._textNodes.push(lt);
       }
     }
   }
@@ -174,7 +199,7 @@ export class NervBarChart extends NervBase<NervBarChartProps> {
       this._bars.fill({ color: barColor, alpha: 0.85 });
 
       if (p.showLabels) {
-        const lt = TextRenderer.create({
+        const lt = this._acquireText({
           text: d.label,
           role: 'mono',
           size: theme.fontSizes.xs,
@@ -183,12 +208,10 @@ export class NervBarChart extends NervBase<NervBarChartProps> {
         });
         lt.x = labelCol - lt.width - theme.spacing.xs;
         lt.y = y + barHeight / 2 - lt.height / 2;
-        this.addChild(lt);
-        this._textNodes.push(lt);
       }
 
       if (p.showValues) {
-        const vt = TextRenderer.create({
+        const vt = this._acquireText({
           text: String(d.value),
           role: 'mono',
           size: theme.fontSizes.xs,
@@ -196,15 +219,11 @@ export class NervBarChart extends NervBase<NervBarChartProps> {
         });
         vt.x = labelCol + barW + theme.spacing.xs;
         vt.y = y + barHeight / 2 - vt.height / 2;
-        this.addChild(vt);
-        this._textNodes.push(vt);
       }
     }
   }
 
   protected onDispose(): void {
-    this._bars.destroy();
-    this._grid.destroy();
-    for (const t of this._textNodes) t.destroy();
+    // No manual child destruction -- NervBase.destroy() handles children.
   }
 }

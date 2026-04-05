@@ -24,7 +24,7 @@ export class NervTooltip extends NervBase<NervTooltipProps> {
   private _bg = new Graphics();
   private _border = new Graphics();
   private _arrow = new Graphics();
-  private _label: Text | null = null;
+  private _label!: Text;
   private _boundShow: () => void;
   private _boundHide: () => void;
   private _attached = false;
@@ -44,7 +44,17 @@ export class NervTooltip extends NervBase<NervTooltipProps> {
   }
 
   protected onInit(): void {
-    this.addChild(this._bg, this._border, this._arrow);
+    const theme = this.theme;
+    // Create label text once; update in redraw
+    this._label = TextRenderer.create({
+      text: '',
+      role: 'mono',
+      size: theme.fontSizes.xs,
+      color: theme.semantic.textPrimary,
+      uppercase: false,
+    });
+
+    this.addChild(this._bg, this._border, this._arrow, this._label);
     this.visible = false;
     this.eventMode = 'none';
 
@@ -186,26 +196,17 @@ export class NervTooltip extends NervBase<NervTooltipProps> {
     }
 
     // Label
-    if (this._label) { this._label.destroy(); this.removeChild(this._label); }
-    this._label = TextRenderer.create({
-      text: p.text ?? 'Tooltip',
-      role: 'mono',
-      size: theme.fontSizes.xs,
-      color: accent,
-      uppercase: false,
-    });
+    TextRenderer.updateText(this._label, p.text ?? 'Tooltip', false);
+    TextRenderer.updateStyle(this._label, { color: accent });
     this._label.x = Math.round((w - this._label.width) / 2);
     this._label.y = Math.round((h - this._label.height) / 2);
-    this.addChild(this._label);
   }
 
   protected onDispose(): void {
+    // Clean up event listeners on target; all children are auto-destroyed
+    // by NervBase.destroy({ children: true }).
     if (this._props.target && this._attached) {
       this.detachFrom(this._props.target);
     }
-    this._bg.destroy();
-    this._border.destroy();
-    this._arrow.destroy();
-    this._label?.destroy();
   }
 }

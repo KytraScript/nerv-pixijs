@@ -1,4 +1,4 @@
-import { Container, Graphics } from 'pixi.js';
+import { Container, Graphics, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps, NervBaseState } from '../../core/NervBase';
 import { TextRenderer } from '../../core/TextRenderer';
@@ -228,7 +228,7 @@ export class NervAccordion extends NervBase<NervAccordionProps, NervAccordionSta
     }
 
     const totalH = cursorY;
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= w && y >= 0 && y <= totalH };
+    this.hitArea = new Rectangle(0, 0, w, totalH);
   }
 
   private _cleanupDisplayObjects(): void {
@@ -247,6 +247,8 @@ export class NervAccordion extends NervBase<NervAccordionProps, NervAccordionSta
   }
 
   protected onDispose(): void {
-    this._cleanupDisplayObjects();
+    // Only clean up event listeners on headers; all children are auto-destroyed
+    // by NervBase.destroy({ children: true }).
+    for (const h of this._headers) { h.removeAllListeners(); }
   }
 }

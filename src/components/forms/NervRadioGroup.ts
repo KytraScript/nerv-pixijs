@@ -1,4 +1,4 @@
-import { Graphics, Container } from 'pixi.js';
+import { Graphics, Container, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps } from '../../core/NervBase';
 import { NervLabel } from '../../primitives/NervLabel';
@@ -42,8 +42,8 @@ export class NervRadioGroup extends NervBase<NervRadioGroupProps> {
   }
 
   protected redraw(): void {
-    // Clear old items
-    for (const item of this._items) { item.destroy({ children: true }); this.removeChild(item); }
+    // Clear old items -- these are ephemeral containers, must be removed before recreating
+    for (const item of this._items) { this.removeChild(item); item.destroy({ children: true }); }
     this._items = [];
 
     const p = this._props;
@@ -95,7 +95,7 @@ export class NervRadioGroup extends NervBase<NervRadioGroupProps> {
         p.onChange?.(opt.value);
       });
 
-      container.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= s + 80 && y >= 0 && y <= itemH };
+      container.hitArea = new Rectangle(0, 0, s + 80, itemH);
 
       this.addChild(container);
       this._items.push(container);
@@ -103,6 +103,8 @@ export class NervRadioGroup extends NervBase<NervRadioGroupProps> {
   }
 
   protected onDispose(): void {
-    for (const item of this._items) item.destroy({ children: true });
+    // Ephemeral items are children, so they'll be auto-destroyed by
+    // NervBase.destroy({ children: true }). Clear the reference array.
+    this._items = [];
   }
 }

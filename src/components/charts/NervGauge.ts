@@ -1,4 +1,4 @@
-import { Graphics } from 'pixi.js';
+import { Graphics, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps, NervBaseState } from '../../core/NervBase';
 import { TextRenderer } from '../../core/TextRenderer';
@@ -24,8 +24,8 @@ export class NervGauge extends NervBase<NervGaugeProps, NervGaugeState> {
   private _arc = new Graphics();
   private _needle = new Graphics();
   private _center = new Graphics();
-  private _labelText: Text | null = null;
-  private _valueText: Text | null = null;
+  private _valueText!: Text;
+  private _labelText!: Text;
   private _animTarget = { value: 0 };
 
   protected defaultProps(): NervGaugeProps {
@@ -36,6 +36,7 @@ export class NervGauge extends NervBase<NervGaugeProps, NervGaugeState> {
       label: '',
       color: 'orange',
       size: 120,
+      interactive: false,
     };
   }
 
@@ -51,6 +52,27 @@ export class NervGauge extends NervBase<NervGaugeProps, NervGaugeState> {
   protected onInit(): void {
     this._animTarget.value = this._props.value ?? 0;
     this.addChild(this._track, this._arc, this._needle, this._center);
+
+    // Create Text objects once
+    const theme = this.theme;
+    const accent = theme.colorForAccent(this._props.color ?? 'orange');
+
+    this._valueText = TextRenderer.create({
+      text: '',
+      role: 'mono',
+      size: theme.fontSizes.lg,
+      color: accent,
+    });
+    this.addChild(this._valueText);
+
+    this._labelText = TextRenderer.create({
+      text: '',
+      role: 'mono',
+      size: theme.fontSizes.xs,
+      color: theme.semantic.textSecondary,
+    });
+    this._labelText.visible = false;
+    this.addChild(this._labelText);
   }
 
   protected onPropsChanged(prev: NervGaugeProps, next: NervGaugeProps): void {
@@ -125,41 +147,27 @@ export class NervGauge extends NervBase<NervGaugeProps, NervGaugeState> {
     this._center.circle(cx, cy, 3);
     this._center.fill({ color: accent });
 
-    // Value text
-    if (this._valueText) { this.removeChild(this._valueText); this._valueText.destroy(); this._valueText = null; }
+    // Value text -- update in place
     const displayVal = Number(value.toFixed(2));
-    this._valueText = TextRenderer.create({
-      text: String(displayVal),
-      role: 'mono',
-      size: theme.fontSizes.lg,
-      color: accent,
-    });
+    TextRenderer.updateText(this._valueText, String(displayVal));
+    TextRenderer.updateStyle(this._valueText, { color: accent, size: theme.fontSizes.lg });
     this._valueText.x = cx - this._valueText.width / 2;
     this._valueText.y = cy + 12;
-    this.addChild(this._valueText);
 
-    // Label text
-    if (this._labelText) { this.removeChild(this._labelText); this._labelText.destroy(); this._labelText = null; }
+    // Label text -- update in place
     if (p.label) {
-      this._labelText = TextRenderer.create({
-        text: p.label,
-        role: 'mono',
-        size: theme.fontSizes.xs,
-        color: theme.semantic.textSecondary,
-      });
+      TextRenderer.updateText(this._labelText, p.label);
+      TextRenderer.updateStyle(this._labelText, { color: theme.semantic.textSecondary, size: theme.fontSizes.xs });
       this._labelText.x = cx - this._labelText.width / 2;
       this._labelText.y = cy + 28;
-      this.addChild(this._labelText);
+      this._labelText.visible = true;
+    } else {
+      this._labelText.visible = false;
     }
   }
 
   protected onDispose(): void {
+    // Only clean up non-child resources
     AnimationManager.kill(this._animTarget);
-    this._track.destroy();
-    this._arc.destroy();
-    this._needle.destroy();
-    this._center.destroy();
-    this._valueText?.destroy();
-    this._labelText?.destroy();
   }
 }

@@ -26,7 +26,7 @@ const SIZE_CONFIG = {
 export class NervPatternAlert extends NervBase<NervPatternAlertProps, NervPatternAlertState> {
   private _shape = new Graphics();
   private _pulseRing = new Graphics();
-  private _label: Text | null = null;
+  private _label!: Text;
   private _ticker: (() => void) | null = null;
 
   constructor(props: NervPatternAlertProps) {
@@ -38,6 +38,7 @@ export class NervPatternAlert extends NervBase<NervPatternAlertProps, NervPatter
       pattern: 'blue',
       label: '',
       size: 'md',
+      interactive: false,
     };
   }
 
@@ -53,6 +54,17 @@ export class NervPatternAlert extends NervBase<NervPatternAlertProps, NervPatter
 
   protected onInit(): void {
     this.addChild(this._pulseRing, this._shape);
+
+    // Create persistent Text object
+    const cfg = SIZE_CONFIG[this._props.size ?? 'md'];
+    this._label = TextRenderer.create({
+      text: '',
+      role: 'mono',
+      size: cfg.fontSize,
+      color: this.theme.semantic.textPrimary,
+    });
+    this._label.visible = false;
+    this.addChild(this._label);
 
     this._ticker = () => {
       const dt = Ticker.shared.deltaMS;
@@ -127,26 +139,21 @@ export class NervPatternAlert extends NervBase<NervPatternAlertProps, NervPatter
       }
     }
 
-    // Label
-    if (this._label) { this._label.destroy(); this.removeChild(this._label); }
+    // Label -- update in place
     const labelText = p.label ?? '';
     if (labelText.length > 0) {
-      this._label = TextRenderer.create({
-        text: labelText,
-        role: 'mono',
-        size: cfg.fontSize,
-        color: this.theme.semantic.textPrimary,
-      });
+      TextRenderer.updateText(this._label, labelText);
+      TextRenderer.updateStyle(this._label, { color: this.theme.semantic.textPrimary, size: cfg.fontSize });
       this._label.x = cx + cfg.shapeR + cfg.gap;
       this._label.y = Math.round(cy - this._label.height / 2);
-      this.addChild(this._label);
+      this._label.visible = true;
+    } else {
+      this._label.visible = false;
     }
   }
 
   protected onDispose(): void {
+    // Clean up ticker only -- NervBase.destroy() handles children.
     if (this._ticker) Ticker.shared.remove(this._ticker);
-    this._shape.destroy();
-    this._pulseRing.destroy();
-    this._label?.destroy();
   }
 }

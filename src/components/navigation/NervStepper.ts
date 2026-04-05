@@ -1,4 +1,4 @@
-import { Graphics } from 'pixi.js';
+import { Graphics, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps, NervBaseState } from '../../core/NervBase';
 import { TextRenderer } from '../../core/TextRenderer';
@@ -21,6 +21,7 @@ export class NervStepper extends NervBase<NervStepperProps> {
       steps: [],
       currentStep: 0,
       color: 'orange',
+      interactive: false,
     };
   }
 
@@ -45,9 +46,9 @@ export class NervStepper extends NervBase<NervStepperProps> {
     const current = p.currentStep ?? 0;
     const { width: w, height: h } = this.getPreferredSize();
 
-    // Cleanup
-    for (const d of this._dots) { d.destroy(); this.removeChild(d); }
-    for (const l of this._labels) { l.destroy(); this.removeChild(l); }
+    // Remove previous dynamic elements from parent (don't destroy -- children: true handles it)
+    for (const d of this._dots) { this.removeChild(d); }
+    for (const l of this._labels) { this.removeChild(l); }
     this._dots = [];
     this._labels = [];
 
@@ -115,12 +116,10 @@ export class NervStepper extends NervBase<NervStepperProps> {
       this._labels.push(label);
     }
 
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= w && y >= 0 && y <= h };
+    this.hitArea = new Rectangle(0, 0, w, h);
   }
 
   protected onDispose(): void {
-    this._lines.destroy();
-    for (const d of this._dots) d.destroy();
-    for (const l of this._labels) l.destroy();
+    // No manual child destruction -- NervBase.destroy() handles children.
   }
 }

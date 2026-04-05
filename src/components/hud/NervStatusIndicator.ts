@@ -1,4 +1,4 @@
-import { Graphics } from 'pixi.js';
+import { Graphics, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps, NervBaseState } from '../../core/NervBase';
 import { TextRenderer } from '../../core/TextRenderer';
@@ -21,18 +21,30 @@ const SIZE_CONFIG = {
 
 export class NervStatusIndicator extends NervBase<NervStatusIndicatorProps> {
   private _dot = new Graphics();
-  private _label: Text | null = null;
+  private _label!: Text;
 
   protected defaultProps(): NervStatusIndicatorProps {
     return {
       status: 'online',
       text: '',
       size: 'md',
+      interactive: false,
     };
   }
 
   protected onInit(): void {
     this.addChild(this._dot);
+
+    // Create persistent Text object
+    const cfg = SIZE_CONFIG[this._props.size ?? 'md'];
+    this._label = TextRenderer.create({
+      text: '',
+      role: 'mono',
+      size: cfg.fontSize,
+      color: this.theme.semantic.textPrimary,
+    });
+    this._label.visible = false;
+    this.addChild(this._label);
   }
 
   private _getStatusColor(): number {
@@ -77,25 +89,21 @@ export class NervStatusIndicator extends NervBase<NervStatusIndicatorProps> {
     this._dot.circle(cfg.dotR, cy, cfg.dotR);
     this._dot.fill({ color, alpha: p.status === 'offline' ? 0.4 : 1 });
 
-    // Label text
-    if (this._label) { this._label.destroy(); this.removeChild(this._label); }
+    // Label text -- update in place
     if (p.text && p.text.length > 0) {
-      this._label = TextRenderer.create({
-        text: p.text,
-        role: 'mono',
-        size: cfg.fontSize,
-        color: this.theme.semantic.textPrimary,
-      });
+      TextRenderer.updateText(this._label, p.text);
+      TextRenderer.updateStyle(this._label, { color: this.theme.semantic.textPrimary, size: cfg.fontSize });
       this._label.x = cfg.dotR * 2 + cfg.gap;
       this._label.y = Math.round(cy - this._label.height / 2);
-      this.addChild(this._label);
+      this._label.visible = true;
+    } else {
+      this._label.visible = false;
     }
 
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= w && y >= 0 && y <= h };
+    this.hitArea = new Rectangle(0, 0, w, h);
   }
 
   protected onDispose(): void {
-    this._dot.destroy();
-    this._label?.destroy();
+    // No manual child destruction -- NervBase.destroy() handles children.
   }
 }

@@ -20,6 +20,7 @@ export class NervSparkline extends NervBase<NervSparklineProps> {
       height: 24,
       color: 'green',
       fill: false,
+      interactive: false,
     };
   }
 
@@ -82,7 +83,6 @@ export class NervSparkline extends NervBase<NervSparklineProps> {
   }
 
   protected onDispose(): void {
-    this._line.destroy();
-    this._fill.destroy();
+    // No manual child destruction -- NervBase.destroy() handles children.
   }
 }

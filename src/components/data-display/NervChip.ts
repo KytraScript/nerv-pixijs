@@ -1,4 +1,4 @@
-import { Graphics } from 'pixi.js';
+import { Graphics, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps } from '../../core/NervBase';
 import { TextRenderer } from '../../core/TextRenderer';
@@ -23,8 +23,7 @@ export class NervChip extends NervBase<NervChipProps> {
   private _bg = new Graphics();
   private _border = new Graphics();
   private _closeBtn = new Graphics();
-  private _label: Text | null = null;
-  private _closeX: Text | null = null;
+  private _label!: Text;
 
   protected defaultProps(): NervChipProps {
     return {
@@ -35,7 +34,16 @@ export class NervChip extends NervBase<NervChipProps> {
   }
 
   protected onInit(): void {
-    this.addChild(this._bg, this._border, this._closeBtn);
+    const theme = this.theme;
+    // Create label text once; update in redraw
+    this._label = TextRenderer.create({
+      text: '',
+      role: 'mono',
+      size: theme.fontSizes.sm,
+      color: theme.semantic.textPrimary,
+    });
+
+    this.addChild(this._bg, this._border, this._label, this._closeBtn);
 
     this._closeBtn.eventMode = 'static';
     this._closeBtn.cursor = 'pointer';
@@ -77,20 +85,13 @@ export class NervChip extends NervBase<NervChipProps> {
     this._border.stroke();
 
     // Label
-    if (this._label) { this._label.destroy(); this.removeChild(this._label); }
-    this._label = TextRenderer.create({
-      text: p.text ?? 'CHIP',
-      role: 'mono',
-      size: theme.fontSizes.sm,
-      color: accent,
-    });
+    TextRenderer.updateText(this._label, p.text ?? 'CHIP', true);
+    TextRenderer.updateStyle(this._label, { color: accent });
     this._label.x = PADDING_X;
     this._label.y = Math.round((h - this._label.height) / 2);
-    this.addChild(this._label);
 
     // Close button
     this._closeBtn.clear();
-    if (this._closeX) { this._closeX.destroy(); this.removeChild(this._closeX); this._closeX = null; }
 
     if (p.removable) {
       const closeX = w - PADDING_X - CLOSE_SIZE;
@@ -104,22 +105,19 @@ export class NervChip extends NervBase<NervChipProps> {
       this._closeBtn.lineTo(closeX, closeY + CLOSE_SIZE);
       this._closeBtn.stroke();
 
-      this._closeBtn.hitArea = {
-        contains: (x: number, y: number) =>
-          x >= closeX - 4 && x <= closeX + CLOSE_SIZE + 4 &&
-          y >= closeY - 4 && y <= closeY + CLOSE_SIZE + 4,
-      };
+      this._closeBtn.hitArea = new Rectangle(
+        closeX - 4, closeY - 4,
+        CLOSE_SIZE + 8, CLOSE_SIZE + 8
+      );
     }
 
     this.cursor = p.disabled ? 'default' : 'pointer';
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= w && y >= 0 && y <= h };
+    this.hitArea = new Rectangle(0, 0, w, h);
   }
 
   protected onDispose(): void {
-    this._bg.destroy();
-    this._border.destroy();
-    this._closeBtn.destroy();
-    this._label?.destroy();
-    this._closeX?.destroy();
+    // Only clean up event listeners; all children are auto-destroyed
+    // by NervBase.destroy({ children: true }).
+    this._closeBtn.removeAllListeners();
   }
 }

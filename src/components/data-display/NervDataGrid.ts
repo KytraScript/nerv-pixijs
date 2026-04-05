@@ -1,4 +1,4 @@
-import { Graphics, Container } from 'pixi.js';
+import { Graphics, Container, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps, NervBaseState } from '../../core/NervBase';
 import { TextRenderer } from '../../core/TextRenderer';
@@ -44,11 +44,10 @@ export class NervDataGrid extends NervBase<NervDataGridProps, NervDataGridState>
   private _headerContainer = new Container();
   private _bodyContainer = new Container();
   private _paginationContainer = new Container();
-  private _titleText: Text | null = null;
+  private _titleText!: Text;
   private _headerTexts: Text[] = [];
   private _cellTexts: Text[] = [];
   private _paginationTexts: Text[] = [];
-  private _sortIndicators: Text[] = [];
 
   constructor(props: NervDataGridProps) {
     super(props, {
@@ -72,7 +71,17 @@ export class NervDataGrid extends NervBase<NervDataGridProps, NervDataGridState>
   }
 
   protected onInit(): void {
-    this.addChild(this._bg, this._border, this._headerBg, this._headerContainer, this._bodyContainer, this._paginationContainer);
+    const theme = this.theme;
+    // Create title text once; toggle visibility in redraw
+    this._titleText = TextRenderer.create({
+      text: '',
+      role: 'display',
+      size: theme.fontSizes.sm,
+      color: theme.semantic.textPrimary,
+    });
+    this._titleText.visible = false;
+
+    this.addChild(this._bg, this._border, this._headerBg, this._headerContainer, this._bodyContainer, this._paginationContainer, this._titleText);
 
     this.on('pointermove', (e) => {
       const local = this.toLocal(e.global);
@@ -185,8 +194,8 @@ export class NervDataGrid extends NervBase<NervDataGridProps, NervDataGridState>
     const { height: h } = this.getPreferredSize();
     const titleOffset = p.title ? TITLE_HEIGHT : 0;
 
-    // Clear old texts
-    this.clearTexts();
+    // Clear old per-redraw texts
+    this._clearPerRedrawTexts();
 
     // Background
     this._bg.clear();
@@ -201,16 +210,13 @@ export class NervDataGrid extends NervBase<NervDataGridProps, NervDataGridState>
 
     // Title
     if (p.title) {
-      if (this._titleText) { this._titleText.destroy(); this.removeChild(this._titleText); }
-      this._titleText = TextRenderer.create({
-        text: p.title,
-        role: 'display',
-        size: theme.fontSizes.sm,
-        color: accent,
-      });
+      TextRenderer.updateText(this._titleText, p.title);
+      TextRenderer.updateStyle(this._titleText, { color: accent });
       this._titleText.x = PADDING;
       this._titleText.y = PADDING;
-      this.addChild(this._titleText);
+      this._titleText.visible = true;
+    } else {
+      this._titleText.visible = false;
     }
 
     // Header background
@@ -349,7 +355,7 @@ export class NervDataGrid extends NervBase<NervDataGridProps, NervDataGridState>
       this._paginationTexts.push(next);
     }
 
-    this.hitArea = { contains: (x: number, y: number) => x >= 0 && x <= w && y >= 0 && y <= h };
+    this.hitArea = new Rectangle(0, 0, w, h);
   }
 
   /** Navigate to a specific page (0-indexed). */
@@ -358,26 +364,22 @@ export class NervDataGrid extends NervBase<NervDataGridProps, NervDataGridState>
     this.setState({ currentPage: clamped, hoveredRow: -1 });
   }
 
-  private clearTexts(): void {
+  private _clearPerRedrawTexts(): void {
+    // These texts are recreated each redraw (dynamic row/column count),
+    // so they must be manually cleaned up before rebuilding.
     for (const t of this._headerTexts) t.destroy();
     for (const t of this._cellTexts) t.destroy();
-    for (const t of this._paginationTexts) t.destroy();
-    for (const t of this._sortIndicators) t.destroy();
+    for (const t of this._paginationTexts) { t.removeAllListeners(); t.destroy(); }
     this._headerTexts.length = 0;
     this._cellTexts.length = 0;
     this._paginationTexts.length = 0;
-    this._sortIndicators.length = 0;
   }
 
   protected onDispose(): void {
-    this.clearTexts();
-    this._titleText?.destroy();
-    this._bg.destroy();
-    this._border.destroy();
-    this._headerBg.destroy();
-    this._rowGraphics.destroy();
-    this._headerContainer.destroy({ children: true });
-    this._bodyContainer.destroy({ children: true });
-    this._paginationContainer.destroy({ children: true });
+    // Only clean up event listeners; all children are auto-destroyed
+    // by NervBase.destroy({ children: true }).
+    this.removeAllListeners('pointermove');
+    this.removeAllListeners('pointerout');
+    this.removeAllListeners('pointerup');
   }
 }

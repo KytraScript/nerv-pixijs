@@ -20,8 +20,6 @@ export class TextRenderer {
   static async installFonts(): Promise<void> {
     if (this._fontsLoaded) return;
     this._fontsLoaded = true;
-    // BitmapFont auto-installs in PixiJS 8 when using Text with renderMode: 'bitmap'
-    // We just need the web fonts loaded
     const theme = NervTheme.instance;
     const families = [
       theme.fonts.display.family,
@@ -32,20 +30,15 @@ export class TextRenderer {
     try {
       await Promise.all(
         families.map(family =>
-          document.fonts.load(`12px "${family}"`).catch(() => {
-            // Font not available, fallbacks will be used
-          })
+          document.fonts.load(`12px "${family}"`).catch(() => {})
         )
       );
-    } catch {
-      // Font loading not supported in this environment
-    }
+    } catch {}
   }
 
-  static create(options: NervTextOptions): Text {
+  private static resolveOptions(options: NervTextOptions) {
     const theme = NervTheme.instance;
     const role = options.role ?? 'mono';
-
     const fontFamily = theme.fontFamily(role);
     const fontSize = options.size ?? theme.fontSizes.md;
     const fill = options.color ?? theme.semantic.textPrimary;
@@ -61,14 +54,17 @@ export class TextRenderer {
     }
 
     const displayText = uppercase ? options.text.toUpperCase() : options.text;
+    return { fontFamily, fontSize, fill, letterSpacing, displayText, uppercase, role };
+  }
+
+  /** Create a canvas-rasterized Text. Use for infrequently changing content. */
+  static create(options: NervTextOptions): Text {
+    const { fontFamily, fontSize, fill, letterSpacing, displayText } = this.resolveOptions(options);
 
     const text = new Text({
       text: displayText,
       style: new TextStyle({
-        fontFamily,
-        fontSize,
-        fill,
-        letterSpacing,
+        fontFamily, fontSize, fill, letterSpacing,
         align: options.align ?? 'left',
         wordWrap: options.maxWidth !== undefined,
         wordWrapWidth: options.maxWidth,
@@ -76,11 +72,21 @@ export class TextRenderer {
     });
 
     if (options.alpha !== undefined) text.alpha = options.alpha;
-
     return text;
   }
 
-  static update(textObj: Text, newText: string, uppercase = true): void {
+  /**
+   * Update an existing Text object's content in-place.
+   * Much cheaper than destroy + create (#2).
+   */
+  static updateText(textObj: Text, newText: string, uppercase = true): void {
     textObj.text = uppercase ? newText.toUpperCase() : newText;
+  }
+
+  /** Update an existing Text object's style (color, size, etc.) */
+  static updateStyle(textObj: Text, updates: Partial<{ color: number; size: number; alpha: number }>): void {
+    if (updates.color !== undefined) (textObj.style as TextStyle).fill = updates.color;
+    if (updates.size !== undefined) (textObj.style as TextStyle).fontSize = updates.size;
+    if (updates.alpha !== undefined) textObj.alpha = updates.alpha;
   }
 }

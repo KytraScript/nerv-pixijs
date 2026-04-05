@@ -7,6 +7,7 @@ export class CullingManager {
   private _tracked = new Set<NervBase>();
   private _cellSize: number;
   private _enabled: boolean;
+  private _tickerFn: (() => void) | null = null;
 
   constructor(viewport: Viewport, cellSize = 512, enabled = true) {
     this._viewport = viewport;
@@ -14,7 +15,8 @@ export class CullingManager {
     this._enabled = enabled;
 
     if (enabled) {
-      Ticker.shared.add(() => this.update());
+      this._tickerFn = () => this.update();
+      Ticker.shared.add(this._tickerFn);
     }
   }
 
@@ -34,13 +36,11 @@ export class CullingManager {
     const screenH = this._viewport.screenHeight;
     const scale = this._viewport.scaled;
 
-    // Visible world bounds
     const left = corner.x;
     const top = corner.y;
     const right = left + screenW / scale;
     const bottom = top + screenH / scale;
 
-    // Add margin for components near the edge
     const margin = this._cellSize;
     const vLeft = left - margin;
     const vTop = top - margin;
@@ -65,6 +65,10 @@ export class CullingManager {
   get trackedCount(): number { return this._tracked.size; }
 
   destroy(): void {
+    if (this._tickerFn) {
+      Ticker.shared.remove(this._tickerFn);
+      this._tickerFn = null;
+    }
     this._tracked.clear();
   }
 }
