@@ -16,15 +16,12 @@ export interface NervToggleProps extends NervBaseProps {
 
 export class NervToggle extends NervBase<NervToggleProps> {
   private _track = new Graphics();
-  // The thumb is a Container holding a Graphics circle.
-  // redraw() updates the circle's color but never touches the Container's position.
-  // The position is animated separately via Ticker.
   private _thumbContainer = new Container();
   private _thumbGfx = new Graphics();
   private _label: NervLabel | null = null;
-  private _lastOnState: boolean | null = null;
   private _animating = false;
   private _animTicker: ((t: { deltaMS: number }) => void) | null = null;
+  private _initialized = false;
 
   protected defaultProps(): NervToggleProps {
     return { on: false, color: 'green', trackWidth: 40, trackHeight: 20, animationMs: 140 };
@@ -36,17 +33,26 @@ export class NervToggle extends NervBase<NervToggleProps> {
     this._label.visible = false;
     this.addChild(this._track, this._thumbContainer, this._label);
 
+    // Children don't generate their own events
+    this._track.eventMode = 'none';
+    this._thumbContainer.eventMode = 'none';
+
     this.on('pointerdown', (e) => { e.stopPropagation(); });
     this.on('pointerup', (e) => {
       e.stopPropagation();
       if (this.isDisabled || this._animating) return;
+
       const next = !this._props.on;
+      const targetX = this._getThumbX(next);
+
+      // Start animation BEFORE setProps so the animation captures the
+      // correct startX before any redraw can interfere
+      this._slideThumbTo(targetX, this._props.animationMs ?? 140);
+
+      // Now update props (triggers redraw for track/thumb color only)
       this.setProps({ on: next });
       this._props.onChange?.(next);
     });
-    // Prevent child events from bubbling and re-triggering
-    this._track.eventMode = 'none';
-    this._thumbContainer.eventMode = 'none';
   }
 
   getPreferredSize(): Size {
@@ -72,29 +78,24 @@ export class NervToggle extends NervBase<NervToggleProps> {
     const isOn = p.on ?? false;
     const thumbR = th / 2 - 3;
 
-    // Track -- redrawn every time (color changes with state)
+    // Track color
     this._track.clear();
     this._track.roundRect(0, 0, tw, th, th / 2);
     this._track.fill({ color: isOn ? accent : theme.semantic.bgPanel, alpha: isOn ? 0.3 : 1 });
     this._track.roundRect(0, 0, tw, th, th / 2);
     this._track.stroke({ width: 1, color: isOn ? accent : theme.semantic.borderDefault, alpha: 0.7 });
 
-    // Thumb circle -- redraw the shape (color changes), but DO NOT touch position
+    // Thumb color only -- position is NEVER set here
     this._thumbGfx.clear();
     this._thumbGfx.circle(0, th / 2, thumbR);
     this._thumbGfx.fill({ color: isOn ? accent : theme.semantic.textMuted });
 
-    // Position -- only change on actual toggle, not hover redraws
-    const targetX = this._getThumbX(isOn);
-    if (this._lastOnState === null) {
-      // First render: snap
-      this._thumbContainer.position.x = targetX;
-      this._lastOnState = isOn;
-    } else if (this._lastOnState !== isOn) {
-      // State toggled: animate the Container (not the Graphics)
-      this._lastOnState = isOn;
-      this._slideThumbTo(targetX, p.animationMs ?? 140);
+    // First render only: snap thumb to initial position
+    if (!this._initialized) {
+      this._initialized = true;
+      this._thumbContainer.position.x = this._getThumbX(isOn);
     }
+    // After first render, position is ONLY changed by _slideThumbTo via click handler
 
     // Label
     if (p.text) {
@@ -106,11 +107,11 @@ export class NervToggle extends NervBase<NervToggleProps> {
       this._label!.visible = false;
     }
 
-    const { width: w, height: h } = this.getPreferredSize();
-    this.hitArea = new Rectangle(0, 0, w, h);
+    this.hitArea = new Rectangle(0, 0, this.getPreferredSize().width, this.getPreferredSize().height);
   }
 
   private _slideThumbTo(targetX: number, durationMs: number): void {
+    // Kill any in-flight animation
     if (this._animTicker) {
       Ticker.shared.remove(this._animTicker);
       this._animTicker = null;
