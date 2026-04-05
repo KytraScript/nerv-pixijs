@@ -1,4 +1,4 @@
-import { Graphics, Rectangle, Ticker } from 'pixi.js';
+import { Graphics, Rectangle } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps } from '../../core/NervBase';
 import { NervLabel } from '../../primitives/NervLabel';
@@ -17,15 +17,12 @@ export class NervToggle extends NervBase<NervToggleProps> {
   private _track = new Graphics();
   private _thumb = new Graphics();
   private _label: NervLabel | null = null;
-  private _lastOnState: boolean | null = null;
-  private _animTickerFn: ((ticker: { deltaMS: number }) => void) | null = null;
 
   protected defaultProps(): NervToggleProps {
     return { on: false, color: 'green', trackWidth: 40, trackHeight: 20 };
   }
 
   protected onInit(): void {
-    // Create the label once; updated in-place via setProps in redraw()
     this._label = new NervLabel({ text: '', role: 'mono', size: this.theme.fontSizes.sm, rawColor: this.theme.semantic.textSecondary, interactive: false });
     this._label.visible = false;
     this.addChild(this._track, this._thumb, this._label);
@@ -55,7 +52,6 @@ export class NervToggle extends NervBase<NervToggleProps> {
     const accent = theme.colorForAccent(p.color ?? 'green');
     const isOn = p.on ?? false;
     const thumbR = th / 2 - 3;
-    const thumbX = isOn ? tw - thumbR - 4 : thumbR + 4;
 
     // Track
     this._track.clear();
@@ -64,22 +60,13 @@ export class NervToggle extends NervBase<NervToggleProps> {
     this._track.roundRect(0, 0, tw, th, th / 2);
     this._track.stroke({ width: 1, color: isOn ? accent : theme.semantic.borderDefault, alpha: 0.7 });
 
-    // Thumb
+    // Thumb -- just set position. No animation. It's a toggle.
     this._thumb.clear();
     this._thumb.circle(0, th / 2, thumbR);
     this._thumb.fill({ color: isOn ? accent : theme.semantic.textMuted });
+    this._thumb.position.x = isOn ? tw - thumbR - 4 : thumbR + 4;
 
-    if (this._lastOnState === null) {
-      // First render -- snap to position
-      this._thumb.position.x = thumbX;
-      this._lastOnState = isOn;
-    } else if (this._lastOnState !== isOn) {
-      // State changed -- animate slide using direct Ticker
-      this._lastOnState = isOn;
-      this._animateThumbTo(thumbX, 150);
-    }
-
-    // Label -- update in-place
+    // Label
     if (p.text) {
       this._label!.visible = true;
       this._label!.setProps({ text: p.text, size: theme.fontSizes.sm, rawColor: theme.semantic.textSecondary });
@@ -93,39 +80,5 @@ export class NervToggle extends NervBase<NervToggleProps> {
     this.hitArea = new Rectangle(0, 0, w, h);
   }
 
-  private _animateThumbTo(targetX: number, durationMs: number): void {
-    // Kill existing animation
-    if (this._animTickerFn) {
-      Ticker.shared.remove(this._animTickerFn);
-      this._animTickerFn = null;
-    }
-
-    const startX = this._thumb.position.x;
-    const delta = targetX - startX;
-    let elapsed = 0;
-
-    this._animTickerFn = (ticker) => {
-      elapsed += ticker.deltaMS;
-      const t = Math.min(elapsed / durationMs, 1);
-      // ease-out cubic
-      const eased = 1 - Math.pow(1 - t, 3);
-      this._thumb.position.x = startX + delta * eased;
-
-      if (t >= 1) {
-        this._thumb.position.x = targetX;
-        if (this._animTickerFn) {
-          Ticker.shared.remove(this._animTickerFn);
-          this._animTickerFn = null;
-        }
-      }
-    };
-
-    Ticker.shared.add(this._animTickerFn);
-  }
-
-  protected onDispose(): void {
-    if (this._animTickerFn) {
-      Ticker.shared.remove(this._animTickerFn);
-    }
-  }
+  protected onDispose(): void {}
 }
