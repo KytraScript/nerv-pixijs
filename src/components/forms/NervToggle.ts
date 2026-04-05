@@ -64,16 +64,22 @@ export class NervToggle extends NervBase<NervToggleProps> {
     this._track.roundRect(0, 0, tw, th, th / 2);
     this._track.stroke({ width: 1, color: isOn ? accent : theme.semantic.borderDefault, alpha: 0.7 });
 
-    // Thumb -- only animate when on/off actually changes, not on hover redraws
+    // Thumb
     this._thumb.clear();
     this._thumb.circle(0, th / 2, thumbR);
     this._thumb.fill({ color: isOn ? accent : theme.semantic.textMuted });
 
-    if (this._lastOnState !== isOn) {
+    if (this._lastOnState === null) {
+      // First render -- snap to position, no animation
+      this._thumb.x = thumbX;
+      this._lastOnState = isOn;
+    } else if (this._lastOnState !== isOn) {
+      // State changed -- animate slide
       this._lastOnState = isOn;
       AnimationManager.kill(this._thumb);
       AnimationManager.tween(this._thumb, { x: thumbX }, 150, { easing: Easing.easeOutCubic });
     }
+    // On hover redraws (state unchanged), don't touch thumb.x
 
     // Label -- update in-place
     if (p.text) {

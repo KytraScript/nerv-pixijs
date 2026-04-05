@@ -137,7 +137,9 @@ export class NervSelectMenu extends NervBase<NervSelectMenuProps, SelectState> {
 
       this._dropdown = new Container();
       this._dropdown.y = triggerY + triggerH + 2;
+      this._dropdown.eventMode = 'static';
       this._dropdown.interactiveChildren = true;
+      this._dropdown.on('pointerdown', (e) => { e.stopPropagation(); });
 
       const ddBg = new Graphics();
       ddBg.rect(0, 0, w, ddH);
@@ -200,7 +202,6 @@ export class NervSelectMenu extends NervBase<NervSelectMenuProps, SelectState> {
       });
 
       this.addChild(this._dropdown);
-      AnimationManager.fadeIn(this._dropdown, 100);
     }
 
     this.hitArea = new Rectangle(0, 0, w, triggerY + triggerH);
