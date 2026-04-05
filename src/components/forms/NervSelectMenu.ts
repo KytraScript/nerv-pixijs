@@ -128,6 +128,14 @@ export class NervSelectMenu extends NervBase<NervSelectMenuProps, SelectState> {
       this._dropdown = null;
     }
 
+    // Bring this component to front when dropdown opens so it renders above siblings
+    if (shouldBeOpen && this.parent) {
+      this.parent.sortableChildren = true;
+      this.zIndex = 1000;
+    } else if (!shouldBeOpen && this.parent) {
+      this.zIndex = 0;
+    }
+
     if (shouldBeOpen && !isCurrentlyOpen) {
       const options = p.options ?? [];
       const maxVis = p.maxVisibleOptions ?? 6;

@@ -1,8 +1,7 @@
-import { Graphics, Rectangle } from 'pixi.js';
+import { Graphics, Rectangle, Ticker } from 'pixi.js';
 import { NervBase } from '../../core/NervBase';
 import type { NervBaseProps } from '../../core/NervBase';
 import { NervLabel } from '../../primitives/NervLabel';
-import { AnimationManager, Easing } from '../../core/AnimationManager';
 import type { NervColor, Size } from '../../core/types';
 
 export interface NervToggleProps extends NervBaseProps {
@@ -19,6 +18,7 @@ export class NervToggle extends NervBase<NervToggleProps> {
   private _thumb = new Graphics();
   private _label: NervLabel | null = null;
   private _lastOnState: boolean | null = null;
+  private _animTickerFn: ((ticker: { deltaMS: number }) => void) | null = null;
 
   protected defaultProps(): NervToggleProps {
     return { on: false, color: 'green', trackWidth: 40, trackHeight: 20 };
@@ -70,16 +70,14 @@ export class NervToggle extends NervBase<NervToggleProps> {
     this._thumb.fill({ color: isOn ? accent : theme.semantic.textMuted });
 
     if (this._lastOnState === null) {
-      // First render -- snap to position, no animation
-      this._thumb.x = thumbX;
+      // First render -- snap to position
+      this._thumb.position.x = thumbX;
       this._lastOnState = isOn;
     } else if (this._lastOnState !== isOn) {
-      // State changed -- animate slide
+      // State changed -- animate slide using direct Ticker
       this._lastOnState = isOn;
-      AnimationManager.kill(this._thumb);
-      AnimationManager.tween(this._thumb, { x: thumbX }, 150, { easing: Easing.easeOutCubic });
+      this._animateThumbTo(thumbX, 150);
     }
-    // On hover redraws (state unchanged), don't touch thumb.x
 
     // Label -- update in-place
     if (p.text) {
@@ -95,8 +93,39 @@ export class NervToggle extends NervBase<NervToggleProps> {
     this.hitArea = new Rectangle(0, 0, w, h);
   }
 
+  private _animateThumbTo(targetX: number, durationMs: number): void {
+    // Kill existing animation
+    if (this._animTickerFn) {
+      Ticker.shared.remove(this._animTickerFn);
+      this._animTickerFn = null;
+    }
+
+    const startX = this._thumb.position.x;
+    const delta = targetX - startX;
+    let elapsed = 0;
+
+    this._animTickerFn = (ticker) => {
+      elapsed += ticker.deltaMS;
+      const t = Math.min(elapsed / durationMs, 1);
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - t, 3);
+      this._thumb.position.x = startX + delta * eased;
+
+      if (t >= 1) {
+        this._thumb.position.x = targetX;
+        if (this._animTickerFn) {
+          Ticker.shared.remove(this._animTickerFn);
+          this._animTickerFn = null;
+        }
+      }
+    };
+
+    Ticker.shared.add(this._animTickerFn);
+  }
+
   protected onDispose(): void {
-    // NervBase.destroy() passes { children: true }, so child Graphics/NervLabel
-    // are auto-destroyed. Nothing extra to clean up here.
+    if (this._animTickerFn) {
+      Ticker.shared.remove(this._animTickerFn);
+    }
   }
 }
