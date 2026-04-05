@@ -23,6 +23,7 @@ export class NervToggle extends NervBase<NervToggleProps> {
   private _thumbGfx = new Graphics();
   private _label: NervLabel | null = null;
   private _lastOnState: boolean | null = null;
+  private _animating = false;
   private _animTicker: ((t: { deltaMS: number }) => void) | null = null;
 
   protected defaultProps(): NervToggleProps {
@@ -38,11 +39,14 @@ export class NervToggle extends NervBase<NervToggleProps> {
     this.on('pointerdown', (e) => { e.stopPropagation(); });
     this.on('pointerup', (e) => {
       e.stopPropagation();
-      if (this.isDisabled) return;
+      if (this.isDisabled || this._animating) return;
       const next = !this._props.on;
       this.setProps({ on: next });
       this._props.onChange?.(next);
     });
+    // Prevent child events from bubbling and re-triggering
+    this._track.eventMode = 'none';
+    this._thumbContainer.eventMode = 'none';
   }
 
   getPreferredSize(): Size {
@@ -119,22 +123,20 @@ export class NervToggle extends NervBase<NervToggleProps> {
       return;
     }
 
+    this._animating = true;
     let elapsed = 0;
-    console.log(`[TOGGLE] slide from ${startX.toFixed(1)} to ${targetX.toFixed(1)}, distance=${distance.toFixed(1)}, duration=${durationMs}ms`);
 
     const tickFn = (ticker: { deltaMS: number }) => {
       elapsed += ticker.deltaMS;
       const t = Math.min(elapsed / durationMs, 1);
       const eased = 1 - Math.pow(1 - t, 3);
-      const newX = startX + distance * eased;
-      this._thumbContainer.position.x = newX;
-      console.log(`[TOGGLE] tick: t=${t.toFixed(3)} x=${newX.toFixed(1)} (elapsed=${elapsed.toFixed(1)}ms)`);
+      this._thumbContainer.position.x = startX + distance * eased;
 
       if (t >= 1) {
         this._thumbContainer.position.x = targetX;
         Ticker.shared.remove(tickFn);
         this._animTicker = null;
-        console.log(`[TOGGLE] animation complete at x=${targetX}`);
+        this._animating = false;
       }
     };
 
