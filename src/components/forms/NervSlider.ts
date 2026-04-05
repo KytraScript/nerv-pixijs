@@ -43,16 +43,34 @@ export class NervSlider extends NervBase<NervSliderProps> {
       this.setValueFromX(local.x);
     };
 
-    this._thumb.on('pointerdown', () => { this._dragging = true; });
-    this._track.on('pointerdown', (e: FederatedPointerEvent) => {
+    this._thumb.on('pointerdown', (e: FederatedPointerEvent) => {
+      e.stopPropagation();
       this._dragging = true;
+      this.context.pauseViewportDrag();
+    });
+    this._track.on('pointerdown', (e: FederatedPointerEvent) => {
+      e.stopPropagation();
+      this._dragging = true;
+      this.context.pauseViewportDrag();
       const local = this.toLocal(e.global);
       this.setValueFromX(local.x);
     });
 
     this.on('globalpointermove', onDrag);
-    this.on('pointerup', () => { if (this._dragging) { this._dragging = false; this._props.onChangeEnd?.(this._props.value ?? 0); } });
-    this.on('pointerupoutside', () => { if (this._dragging) { this._dragging = false; this._props.onChangeEnd?.(this._props.value ?? 0); } });
+    this.on('pointerup', () => {
+      if (this._dragging) {
+        this._dragging = false;
+        this.context.resumeViewportDrag();
+        this._props.onChangeEnd?.(this._props.value ?? 0);
+      }
+    });
+    this.on('pointerupoutside', () => {
+      if (this._dragging) {
+        this._dragging = false;
+        this.context.resumeViewportDrag();
+        this._props.onChangeEnd?.(this._props.value ?? 0);
+      }
+    });
   }
 
   private setValueFromX(x: number): void {

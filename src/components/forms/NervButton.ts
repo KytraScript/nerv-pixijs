@@ -36,7 +36,9 @@ export class NervButton extends NervBase<NervButtonProps> {
     this._label = TextRenderer.create({ text: '', role: 'display', size: 12, color: 0xffffff });
     this.addChild(this._bg, this._border, this._brackets, this._label);
 
-    this.on('pointerup', () => {
+    this.on('pointerdown', (e) => { e.stopPropagation(); });
+    this.on('pointerup', (e) => {
+      e.stopPropagation();
       if (!this.isDisabled && !this._props.loading) {
         AnimationManager.pulse(this, 1.03, 150);
         this._props.onClick?.();

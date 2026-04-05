@@ -20,7 +20,6 @@ export interface NervInputFieldProps extends NervBaseProps {
 
 interface NervInputFieldState extends NervBaseState {
   cursorVisible: boolean;
-  cursorPos: number;
 }
 
 const SIZE_MAP = { sm: { h: 28, fontSize: 10 }, md: { h: 36, fontSize: 12 }, lg: { h: 44, fontSize: 14 } } as const;
@@ -36,7 +35,7 @@ export class NervInputField extends NervBase<NervInputFieldProps, NervInputField
   private _internalValue = '';
 
   constructor(props: NervInputFieldProps) {
-    super(props, { focused: false, hovered: false, pressed: false, cursorVisible: false, cursorPos: 0 });
+    super(props, { focused: false, hovered: false, pressed: false, cursorVisible: false });
     this._internalValue = props.value ?? '';
   }
 
@@ -51,7 +50,6 @@ export class NervInputField extends NervBase<NervInputFieldProps, NervInputField
   }
 
   protected onInit(): void {
-    // Create text objects once; updated in-place in redraw()
     this._labelText = TextRenderer.create({ text: '', role: 'mono', size: 10, color: 0x888888 });
     this._labelText.visible = false;
     this._valueText = TextRenderer.create({ text: '', role: 'mono', size: 12, color: 0xffffff, uppercase: false });
@@ -62,21 +60,39 @@ export class NervInputField extends NervBase<NervInputFieldProps, NervInputField
     this.addChild(this._bg, this._border, this._labelText, this._valueText, this._placeholderText, this._cursor);
     this._cursor.visible = false;
 
-    this.on('pointerdown', () => {
-      this.focus();
+    // Use NervContext to coordinate focus system-wide
+    this.on('pointerdown', (e) => {
+      e.stopPropagation();
+      if (!this.isFocused) {
+        this.context.focusComponent(this);
+      }
     });
   }
 
   focus(): void {
+    // Clear any existing timer first to prevent stacking
+    if (this._cursorTimer) {
+      clearInterval(this._cursorTimer);
+      this._cursorTimer = null;
+    }
+
     super.focus();
+
+    // Activate text input proxy so keyboard events route here
+    this.context.activateTextInput(this, false, this._internalValue);
+
     this._cursorTimer = setInterval(() => {
       this.setState({ cursorVisible: !this._state.cursorVisible } as Partial<NervInputFieldState>);
     }, 530);
   }
 
   blur(): void {
+    if (this._cursorTimer) {
+      clearInterval(this._cursorTimer);
+      this._cursorTimer = null;
+    }
+    this.context.deactivateTextInput();
     super.blur();
-    if (this._cursorTimer) { clearInterval(this._cursorTimer); this._cursorTimer = null; }
     this.setState({ cursorVisible: false } as Partial<NervInputFieldState>);
   }
 
@@ -87,6 +103,10 @@ export class NervInputField extends NervBase<NervInputFieldProps, NervInputField
       this.scheduleRedraw();
     } else if (e.key === 'Enter') {
       this._props.onSubmit?.(this._internalValue);
+    } else if (e.key === 'Escape') {
+      this.context.blurFocused();
+    } else if (e.key === 'Tab') {
+      // Tab handled by InputManager
     } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
       if (this._props.maxLength && this._internalValue.length >= this._props.maxLength) return;
       this._internalValue += e.key;
@@ -105,12 +125,10 @@ export class NervInputField extends NervBase<NervInputFieldProps, NervInputField
     const labelH = hasLabel ? cfg.fontSize + 6 : 0;
     const fieldY = labelH;
 
-    // Background
     this._bg.clear();
     this._bg.rect(0, fieldY, w, cfg.h);
     this._bg.fill({ color: theme.semantic.bgPanel });
 
-    // Border
     this._border.clear();
     const borderColor = p.error ? theme.colors.red : (this._state.focused ? accent : theme.semantic.borderDefault);
     const borderAlpha = this._state.focused ? 1 : theme.effects.borderAlpha;
@@ -118,7 +136,6 @@ export class NervInputField extends NervBase<NervInputFieldProps, NervInputField
     this._border.rect(0, fieldY, w, cfg.h);
     this._border.stroke();
 
-    // Focus brackets
     if (this._state.focused) {
       this._border.setStrokeStyle({ width: 2, color: accent, alpha: 1 });
       const cs = 6;
@@ -129,7 +146,6 @@ export class NervInputField extends NervBase<NervInputFieldProps, NervInputField
       this._border.stroke();
     }
 
-    // Label -- update in-place
     if (hasLabel) {
       this._labelText!.visible = true;
       this._labelText!.text = `// ${p.inputLabel}`.toUpperCase();
@@ -141,7 +157,6 @@ export class NervInputField extends NervBase<NervInputFieldProps, NervInputField
       this._labelText!.visible = false;
     }
 
-    // Value text -- update in-place
     const displayVal = p.password ? '*'.repeat(this._internalValue.length) : this._internalValue;
     if (displayVal) {
       this._valueText!.visible = true;
@@ -154,7 +169,6 @@ export class NervInputField extends NervBase<NervInputFieldProps, NervInputField
       this._valueText!.visible = false;
     }
 
-    // Placeholder -- update in-place
     if (!displayVal && p.placeholder) {
       this._placeholderText!.visible = true;
       this._placeholderText!.text = p.placeholder.toUpperCase();
@@ -167,10 +181,9 @@ export class NervInputField extends NervBase<NervInputFieldProps, NervInputField
       this._placeholderText!.visible = false;
     }
 
-    // Cursor
     this._cursor.clear();
     if (this._state.focused && this._state.cursorVisible) {
-      const cursorX = 8 + (this._valueText?.width ?? 0) + 2;
+      const cursorX = 8 + (this._valueText!.visible ? this._valueText!.width : 0) + 2;
       this._cursor.setStrokeStyle({ width: 1.5, color: accent });
       this._cursor.moveTo(cursorX, fieldY + 6);
       this._cursor.lineTo(cursorX, fieldY + cfg.h - 6);
@@ -185,7 +198,6 @@ export class NervInputField extends NervBase<NervInputFieldProps, NervInputField
   set value(v: string) { this._internalValue = v; this.scheduleRedraw(); }
 
   protected onDispose(): void {
-    // Only clean up non-child resources; children are auto-destroyed by NervBase
     if (this._cursorTimer) clearInterval(this._cursorTimer);
   }
 }

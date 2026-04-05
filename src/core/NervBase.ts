@@ -1,5 +1,6 @@
 import { Container, DestroyOptions, Rectangle, Ticker } from 'pixi.js';
 import { NervTheme } from './NervTheme';
+import { NervContext } from './NervContext';
 import { AnimationManager } from './AnimationManager';
 import type { Insets, Size } from './types';
 import { INSETS_ZERO } from './types';
@@ -87,8 +88,9 @@ export abstract class NervBase<
     Ticker.shared.addOnce(this._tickerCallback);
   }
 
-  // -- Theme shortcut --
+  // -- Theme + Context shortcuts --
   protected get theme(): NervTheme { return NervTheme.instance; }
+  protected get context(): NervContext { return NervContext.instance; }
 
   // -- Computed dimensions --
   get componentWidth(): number { return this._props.width ?? this.getPreferredSize().width; }

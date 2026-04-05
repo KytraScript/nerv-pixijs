@@ -7,6 +7,7 @@ import { InputManager } from './InputManager';
 import { FocusManager } from './FocusManager';
 import { CullingManager } from './CullingManager';
 import { TextRenderer } from './TextRenderer';
+import { NervContext } from './NervContext';
 
 export interface NervAppOptions {
   canvas?: HTMLCanvasElement;
@@ -101,12 +102,26 @@ export class NervApp {
     const inputManager = new InputManager(focusManager);
     inputManager.initialize();
 
+    // Initialize context so components can access managers
+    const context = new NervContext(focusManager, inputManager);
+    context.setViewportDragControl(
+      () => { viewport.plugins.pause('drag'); },
+      () => { viewport.plugins.resume('drag'); },
+    );
+    NervContext.initialize(context);
+
     const cullingManager = new CullingManager(
       viewport, 512,
       options.enableCulling !== false,
     );
 
-    // Resize handler -- stored so we can remove it on destroy (#5)
+    // Click on empty canvas blurs focused component
+    viewport.on('pointerdown', (e) => {
+      if (e.target === viewport) {
+        context.blurFocused();
+      }
+    });
+
     const onResize = () => {
       const w = window.innerWidth;
       const h = window.innerHeight;

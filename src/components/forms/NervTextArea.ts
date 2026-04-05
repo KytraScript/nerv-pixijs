@@ -55,19 +55,28 @@ export class NervTextArea extends NervBase<NervTextAreaProps, NervTextAreaState>
     this._placeholderText.visible = false;
 
     this.addChild(this._bg, this._border, this._labelText, this._valueText, this._placeholderText, this._cursor);
-    this.on('pointerdown', () => this.focus());
+
+    this.on('pointerdown', (e) => {
+      e.stopPropagation();
+      if (!this.isFocused) {
+        this.context.focusComponent(this);
+      }
+    });
   }
 
   focus(): void {
+    if (this._cursorTimer) { clearInterval(this._cursorTimer); this._cursorTimer = null; }
     super.focus();
+    this.context.activateTextInput(this, true, this._internalValue);
     this._cursorTimer = setInterval(() => {
       this.setState({ cursorVisible: !this._state.cursorVisible } as Partial<NervTextAreaState>);
     }, 530);
   }
 
   blur(): void {
-    super.blur();
     if (this._cursorTimer) { clearInterval(this._cursorTimer); this._cursorTimer = null; }
+    this.context.deactivateTextInput();
+    super.blur();
     this.setState({ cursorVisible: false } as Partial<NervTextAreaState>);
   }
 

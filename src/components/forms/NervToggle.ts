@@ -61,12 +61,13 @@ export class NervToggle extends NervBase<NervToggleProps> {
     this._track.roundRect(0, 0, tw, th, th / 2);
     this._track.stroke({ width: 1, color: isOn ? accent : theme.semantic.borderDefault, alpha: 0.7 });
 
-    // Thumb
-    AnimationManager.tween(this._thumb, { x: thumbX }, 120, { easing: Easing.easeOutCubic });
+    // Thumb -- animate position, redraw shape
     this._thumb.clear();
     this._thumb.circle(0, th / 2, thumbR);
     this._thumb.fill({ color: isOn ? accent : theme.semantic.textMuted });
-    if (!this._thumb.x) this._thumb.x = thumbX;
+    // Kill any existing tween on the thumb before starting a new one
+    AnimationManager.kill(this._thumb);
+    AnimationManager.tween(this._thumb, { x: thumbX }, 150, { easing: Easing.easeOutCubic });
 
     // Label -- update in-place
     if (p.text) {

@@ -7,6 +7,7 @@ export type { NervAppOptions } from './NervApp';
 export { InputManager } from './InputManager';
 export type { KeyboardEventHandler } from './InputManager';
 export { FocusManager } from './FocusManager';
+export { NervContext } from './NervContext';
 export { LayoutEngine } from './LayoutEngine';
 export { AnimationManager, Easing, Tween } from './AnimationManager';
 export { TextRenderer } from './TextRenderer';
