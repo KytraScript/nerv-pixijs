@@ -65,8 +65,9 @@ export class NervTextArea extends NervBase<NervTextAreaProps, NervTextAreaState>
     this._labelText = TextRenderer.create({ text: '', role: 'mono', size: 10, color: 0x888888 });
     this._labelText.visible = false;
 
-    this._valueText = TextRenderer.create({ text: '', role: 'mono', size: FONT_SIZE, color: 0xffffff, uppercase: false });
-    this._placeholderText = TextRenderer.create({ text: '', role: 'mono', size: FONT_SIZE, color: 0x888888, alpha: 0.5, uppercase: false });
+    const wrapWidth = (this._props.width ?? 300) - PAD * 2 - 8;
+    this._valueText = TextRenderer.create({ text: '', role: 'mono', size: FONT_SIZE, color: 0xffffff, uppercase: false, maxWidth: wrapWidth });
+    this._placeholderText = TextRenderer.create({ text: '', role: 'mono', size: FONT_SIZE, color: 0x888888, alpha: 0.5, uppercase: false, maxWidth: wrapWidth });
     this._placeholderText.visible = false;
 
     this._scrollContainer.addChild(this._valueText, this._placeholderText, this._cursor);
@@ -234,11 +235,13 @@ export class NervTextArea extends NervBase<NervTextAreaProps, NervTextAreaState>
     if (this._internalValue) {
       this._valueText!.visible = true;
       this._valueText!.text = this._internalValue;
-      (this._valueText!.style as TextStyle).fill = theme.semantic.textPrimary;
-      (this._valueText!.style as TextStyle).fontSize = FONT_SIZE;
-      (this._valueText!.style as TextStyle).wordWrap = true;
-      (this._valueText!.style as TextStyle).wordWrapWidth = w - PAD * 2 - 8;
-      (this._valueText!.style as TextStyle).lineHeight = LINE_HEIGHT;
+      // Force style update to ensure word wrap recalculates
+      const vs = this._valueText!.style as TextStyle;
+      vs.fill = theme.semantic.textPrimary;
+      vs.fontSize = FONT_SIZE;
+      vs.lineHeight = LINE_HEIGHT;
+      vs.wordWrap = true;
+      vs.wordWrapWidth = w - PAD * 2 - 8;
       this._valueText!.x = PAD;
       this._valueText!.y = 0;
       this._placeholderText!.visible = false;
