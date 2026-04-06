@@ -24,11 +24,13 @@ export class InputManager {
 
     for (const el of [this._hiddenInput, this._hiddenTextarea]) {
       el.style.position = 'fixed';
-      el.style.left = '-9999px';
-      el.style.top = '-9999px';
-      el.style.opacity = '0';
+      el.style.top = '0';
+      el.style.left = '0';
       el.style.width = '1px';
       el.style.height = '1px';
+      el.style.opacity = '0';
+      el.style.pointerEvents = 'none';
+      el.style.zIndex = '-1';
       el.setAttribute('tabindex', '-1');
       el.setAttribute('autocomplete', 'off');
       el.setAttribute('autocorrect', 'off');
@@ -84,7 +86,7 @@ export class InputManager {
     this._activeTextTarget = target;
     const el = multiline ? this._hiddenTextarea : this._hiddenInput;
     el.value = currentValue;
-    el.focus();
+    el.focus({ preventScroll: true });
   }
 
   deactivateTextProxy(): void {

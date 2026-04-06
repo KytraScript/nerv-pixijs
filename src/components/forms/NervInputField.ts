@@ -27,6 +27,7 @@ const SIZE_MAP = { sm: { h: 28, fontSize: 10 }, md: { h: 36, fontSize: 12 }, lg:
 export class NervInputField extends NervBase<NervInputFieldProps, NervInputFieldState> implements KeyboardEventHandler {
   private _bg = new Graphics();
   private _border = new Graphics();
+  private _clipMask = new Graphics();
   private _valueText: Text | null = null;
   private _placeholderText: Text | null = null;
   private _labelText: Text | null = null;
@@ -57,8 +58,13 @@ export class NervInputField extends NervBase<NervInputFieldProps, NervInputField
     this._placeholderText = TextRenderer.create({ text: '', role: 'mono', size: 12, color: 0x888888, alpha: 0.5, uppercase: false });
     this._placeholderText.visible = false;
 
-    this.addChild(this._bg, this._border, this._labelText, this._valueText, this._placeholderText, this._cursor);
+    this.addChild(this._bg, this._border, this._clipMask, this._labelText, this._valueText, this._placeholderText, this._cursor);
     this._cursor.visible = false;
+
+    // Mask value/placeholder/cursor to field bounds
+    this._valueText.mask = this._clipMask;
+    this._placeholderText.mask = this._clipMask;
+    this._cursor.mask = this._clipMask;
 
     // Use NervContext to coordinate focus system-wide
     this.on('pointerdown', (e) => {
@@ -128,6 +134,11 @@ export class NervInputField extends NervBase<NervInputFieldProps, NervInputField
     this._bg.clear();
     this._bg.rect(0, fieldY, w, cfg.h);
     this._bg.fill({ color: theme.semantic.bgPanel });
+
+    // Clip mask -- prevents text from rendering outside field bounds
+    this._clipMask.clear();
+    this._clipMask.rect(4, fieldY + 2, w - 8, cfg.h - 4);
+    this._clipMask.fill({ color: 0xffffff });
 
     this._border.clear();
     const borderColor = p.error ? theme.colors.red : (this._state.focused ? accent : theme.semantic.borderDefault);
