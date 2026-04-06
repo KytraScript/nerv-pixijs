@@ -8,3 +8,4 @@ export * from './components/charts';
 export * from './components/overlays';
 export * from './components/navigation';
 export * from './components/hud';
+export * from './components/game';
