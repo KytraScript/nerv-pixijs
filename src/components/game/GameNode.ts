@@ -107,8 +107,10 @@ export class GameNode extends NervBase<GameNodeProps, GameNodeState> {
   private _onDragStart(e: FederatedPointerEvent): void {
     e.stopPropagation();
     if (NervContext.available) NervContext.instance.pauseViewportDrag();
-    this._dragOffset.x = e.global.x - this.x;
-    this._dragOffset.y = e.global.y - this.y;
+    // Calculate offset in parent-local space so zoom/pan are accounted for
+    const local = this.parent!.toLocal(e.global);
+    this._dragOffset.x = local.x - this.x;
+    this._dragOffset.y = local.y - this.y;
     this.setState({ dragging: true } as Partial<GameNodeState>);
     this.alpha = 0.85;
     this.zIndex = 9999;
@@ -116,15 +118,9 @@ export class GameNode extends NervBase<GameNodeProps, GameNodeState> {
   }
 
   private _onDragMove(e: FederatedPointerEvent): void {
-    if (!this._state.dragging) return;
-    // Convert global coords to parent-local coords
-    const parent = this.parent;
-    if (!parent) return;
-    const local = parent.toLocal(e.global);
-    this.position.set(local.x - this._dragOffset.x + this.x - (e.global.x - this._dragOffset.x - this.x), local.y - this._dragOffset.y + this.y - (e.global.y - this._dragOffset.y - this.y));
-    // Simpler: just use global offset directly since viewport handles transforms
-    this.x = e.global.x - this._dragOffset.x;
-    this.y = e.global.y - this._dragOffset.y;
+    if (!this._state.dragging || !this.parent) return;
+    const local = this.parent.toLocal(e.global);
+    this.position.set(local.x - this._dragOffset.x, local.y - this._dragOffset.y);
   }
 
   private _onDragEnd(_e: FederatedPointerEvent): void {
