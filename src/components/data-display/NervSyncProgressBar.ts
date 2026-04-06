@@ -13,13 +13,17 @@ export interface NervSyncProgressBarProps extends NervBaseProps {
   label?: string;
   barWidth?: number;
   barHeight?: number;
+  /** Transition duration in ms when value changes (default 200, 0 to snap) */
+  transitionMs?: number;
 }
 
 export class NervSyncProgressBar extends NervBase<NervSyncProgressBarProps> {
   private _bg = new Graphics();
   private _border = new Graphics();
-  private _segments = new Graphics();
+  private _segmentsGfx = new Graphics();
   private _labelText!: Text;
+  private _displayValue = 0;
+  private _rafId = 0;
 
   protected defaultProps(): NervSyncProgressBarProps {
     return {
@@ -29,21 +33,57 @@ export class NervSyncProgressBar extends NervBase<NervSyncProgressBarProps> {
       showLabel: true,
       barWidth: 200,
       barHeight: 16,
+      transitionMs: 200,
     };
   }
 
   protected onInit(): void {
-    const theme = this.theme;
-    // Create label text once; toggle visibility in redraw
+    this._displayValue = this._props.value ?? 0;
     this._labelText = TextRenderer.create({
       text: '',
       role: 'mono',
-      size: theme.fontSizes.xs,
-      color: theme.semantic.textPrimary,
+      size: this.theme.fontSizes.xs,
+      color: this.theme.semantic.textPrimary,
     });
     this._labelText.visible = false;
+    this.addChild(this._bg, this._segmentsGfx, this._border, this._labelText);
+  }
 
-    this.addChild(this._bg, this._segments, this._border, this._labelText);
+  protected onPropsChanged(prev: NervSyncProgressBarProps, next: NervSyncProgressBarProps): void {
+    if (prev.value !== next.value) {
+      const targetValue = Math.max(0, Math.min(1, next.value ?? 0));
+      const duration = next.transitionMs ?? 200;
+      if (duration <= 0) {
+        this._displayValue = targetValue;
+        return; // redraw will pick it up via scheduleRedraw from setProps
+      }
+      this._animateValue(targetValue, duration);
+    }
+  }
+
+  private _animateValue(target: number, durationMs: number): void {
+    if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = 0; }
+
+    const start = this._displayValue;
+    const distance = target - start;
+    if (Math.abs(distance) < 0.001) { this._displayValue = target; return; }
+
+    const startTime = performance.now();
+
+    const frame = () => {
+      const t = Math.min((performance.now() - startTime) / durationMs, 1);
+      const eased = 1 - (1 - t) * (1 - t); // ease-out quad
+      this._displayValue = start + distance * eased;
+      this._drawBar();
+      if (t < 1) {
+        this._rafId = requestAnimationFrame(frame);
+      } else {
+        this._displayValue = target;
+        this._drawBar();
+        this._rafId = 0;
+      }
+    };
+    this._rafId = requestAnimationFrame(frame);
   }
 
   getPreferredSize(): Size {
@@ -54,45 +94,42 @@ export class NervSyncProgressBar extends NervBase<NervSyncProgressBarProps> {
   }
 
   protected redraw(): void {
+    this._drawBar();
+  }
+
+  private _drawBar(): void {
     const p = this._props;
     const theme = this.theme;
     const accent = theme.colorForAccent(p.color ?? 'orange');
     const barW = p.barWidth ?? 200;
     const barH = p.barHeight ?? 16;
     const segmentCount = Math.max(1, p.segments ?? 20);
-    const value = Math.max(0, Math.min(1, p.value ?? 0));
+    const value = Math.max(0, Math.min(1, this._displayValue));
     const gap = 2;
     const segWidth = (barW - gap * (segmentCount - 1)) / segmentCount;
     const filledSegments = Math.round(value * segmentCount);
 
-    // Background
     this._bg.clear();
     this._bg.rect(0, 0, barW, barH);
     this._bg.fill({ color: theme.semantic.bgPanel });
 
-    // Border
     this._border.clear();
     this._border.setStrokeStyle({ width: theme.effects.borderWidth, color: accent, alpha: theme.effects.borderAlpha });
     this._border.rect(0, 0, barW, barH);
     this._border.stroke();
 
-    // Segments
-    this._segments.clear();
+    this._segmentsGfx.clear();
     for (let i = 0; i < segmentCount; i++) {
       const x = i * (segWidth + gap);
-      const filled = i < filledSegments;
-
-      this._segments.rect(x + 1, 1, segWidth - 1, barH - 2);
-      if (filled) {
-        // Trailing segment gets a slightly dimmer alpha for a sweep effect
+      this._segmentsGfx.rect(x + 1, 1, segWidth - 1, barH - 2);
+      if (i < filledSegments) {
         const segAlpha = i === filledSegments - 1 ? 0.85 : 1;
-        this._segments.fill({ color: accent, alpha: segAlpha });
+        this._segmentsGfx.fill({ color: accent, alpha: segAlpha });
       } else {
-        this._segments.fill({ color: theme.semantic.borderDefault, alpha: 0.15 });
+        this._segmentsGfx.fill({ color: theme.semantic.borderDefault, alpha: 0.15 });
       }
     }
 
-    // Label
     if (p.showLabel) {
       const percent = Math.round(value * 100);
       const labelStr = p.label ? `${p.label} ${percent}%` : `${percent}%`;
@@ -109,6 +146,6 @@ export class NervSyncProgressBar extends NervBase<NervSyncProgressBarProps> {
   }
 
   protected onDispose(): void {
-    // All children are auto-destroyed by NervBase.destroy({ children: true }).
+    if (this._rafId) cancelAnimationFrame(this._rafId);
   }
 }
